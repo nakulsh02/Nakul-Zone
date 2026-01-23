@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reflex Master ⚡</title>
+<style>
+:root{
+  --neon:#00f7ff;
+  --bg:#070b18;
+  --ready:#1a73ff;
+  --hit:#21c87a;
+  --miss:#ff4d6d;
+  --button:#101935;
+}
+
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+  font-family:Segoe UI,sans-serif;
+}
+
+body{
+  min-height:100vh;
+  background:radial-gradient(circle at top,#1a2550,var(--bg));
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  color:white;
+  flex-direction:column;
+}
+
+h1{
+  margin-bottom:20px;
+  background:linear-gradient(90deg,#00f7ff,#6affb3);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  text-align:center;
+}
+
+#reactionTime, #bestTime{
+  font-size:1.2rem;
+  color:var(--neon);
+  margin-bottom:15px;
+}
+
+#gameArea{
+  width:100%;
+  max-width:400px;
+  height:300px;
+  background:var(--bg);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  border-radius:20px;
+  box-shadow:0 0 40px rgba(0,247,255,0.3);
+  cursor:pointer;
+  transition:0.3s;
+  position:relative;
+}
+
+#reflexBtn{
+  padding:20px 40px;
+  border:none;
+  border-radius:12px;
+  background:var(--button);
+  color:var(--neon);
+  font-size:1.5rem;
+  cursor:pointer;
+  display:none;
+  position:absolute;
+  box-shadow:0 0 20px var(--neon);
+  transition:0.2s all ease;
+}
+
+#reflexBtn:hover{
+  transform:scale(1.1);
+}
+</style>
+</head>
+<body>
+
+<h1>Reflex Master ⚡</h1>
+<div id="reactionTime">Reaction Time: 0 ms</div>
+<div id="bestTime">Best Time: 0 ms</div>
+<div id="gameArea">Click when it turns BLUE!</div>
+<button id="reflexBtn">CLICK!</button>
+
+<script>
+const gameArea = document.getElementById('gameArea');
+const reflexBtn = document.getElementById('reflexBtn');
+const reactionTimeDisplay = document.getElementById('reactionTime');
+const bestTimeDisplay = document.getElementById('bestTime');
+
+let startTime = 0;
+let bestTime = 0;
+let waiting = false;
+let ready = false;
+
+// Start a new round
+function startRound(){
+  reflexBtn.style.display='none';
+  gameArea.style.background='#101935';
+  gameArea.innerText = 'Wait for BLUE...';
+  ready = false;
+  
+  const delay = Math.random()*2000 + 1000; // 1-3 seconds
+  waiting = setTimeout(()=>{
+    gameArea.style.background='#1a73ff'; // ready to click
+    gameArea.innerText = 'CLICK NOW!';
+    startTime = performance.now();
+    ready = true;
+  }, delay);
+}
+
+// Handle click
+gameArea.addEventListener('click', ()=>{
+  if(!ready){
+    // Clicked too early
+    clearTimeout(waiting);
+    gameArea.style.background='#ff4d6d';
+    gameArea.innerText='Too Soon! Wait for BLUE';
+    setTimeout(startRound,1000);
+  } else {
+    const reaction = Math.round(performance.now() - startTime);
+    reactionTimeDisplay.innerText = `Reaction Time: ${reaction} ms`;
+    if(bestTime === 0 || reaction < bestTime){
+      bestTime = reaction;
+      bestTimeDisplay.innerText = `Best Time: ${bestTime} ms`;
+    }
+    gameArea.style.background='#21c87a';
+    gameArea.innerText='Good Job!';
+    setTimeout(startRound,1000);
+  }
+});
+
+// Start first round
+startRound();
+</script>
+
+</body>
+</html>
