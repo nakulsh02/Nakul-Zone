@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neon Racer️</title>
+<style>
+:root{
+  --bg:#070b18;
+  --road:#101935;
+  --road-lines:#00f7ff;
+  --car:#ff4d6d;
+  --obstacle:#21c87a;
+  --score-color:#00f7ff;
+}
+
+*{margin:0; padding:0; box-sizing:border-box;}
+body{
+  background:var(--bg);
+  color:white;
+  font-family:Segoe UI,sans-serif;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  flex-direction:column;
+  min-height:100vh;
+}
+
+h1{
+  margin:20px;
+  background:linear-gradient(90deg,#00f7ff,#6affb3);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+
+#score{
+  font-size:1.3rem;
+  margin-bottom:10px;
+  color:var(--score-color);
+}
+
+#gameCanvas{
+  background:var(--road);
+  border-radius:15px;
+  box-shadow:0 0 20px rgba(0,247,255,0.3);
+  touch-action: none;
+}
+</style>
+</head>
+<body>
+
+<h1>Neon Racer️</h1>
+<div id="score">Score: 0</div>
+<canvas id="gameCanvas" width="300" height="500"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+const roadWidth = canvas.width * 0.6;
+const roadX = (canvas.width - roadWidth)/2;
+const roadLineWidth = 5;
+let speed = 4;
+let score = 0;
+
+// Neon colors
+const roadColor = '#101935';
+const roadLineColor = '#00f7ff';
+const carColor = '#ff4d6d';
+const obstacleColor = '#21c87a';
+
+// Player car
+const car = {
+  x: canvas.width/2 - 15,
+  y: canvas.height - 60,
+  width:30,
+  height:50
+}
+
+// Road lines for motion effect
+let lines = [];
+for(let i=0;i<20;i++){
+  lines.push({x:canvas.width/2, y:i*50, width:roadLineWidth, height:40});
+}
+
+// Obstacles
+let obstacles = [];
+
+// Track mouse
+let targetX = car.x + car.width/2;
+canvas.addEventListener('mousemove', e=>{
+  const rect = canvas.getBoundingClientRect();
+  targetX = e.clientX - rect.left;
+});
+
+// Mobile touch
+canvas.addEventListener('touchmove', e=>{
+  const rect = canvas.getBoundingClientRect();
+  targetX = e.touches[0].clientX - rect.left;
+});
+
+// Spawn obstacles
+function spawnObstacle(){
+  const width = Math.random()*30 + 20;
+  const x = roadX + Math.random()*(roadWidth - width);
+  obstacles.push({x: x, y:-50, width:width, height:20});
+}
+
+// Draw everything
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // Draw road
+  ctx.fillStyle=roadColor;
+  ctx.fillRect(roadX,0,roadWidth,canvas.height);
+
+  // Road lines
+  ctx.fillStyle=roadLineColor;
+  lines.forEach(l=>{
+    ctx.fillRect(l.x - l.width/2, l.y, l.width, l.height);
+    l.y += speed;
+    if(l.y>canvas.height) l.y=-50;
+  });
+
+  // Player car
+  ctx.fillStyle=carColor;
+  ctx.fillRect(car.x, car.y, car.width, car.height);
+
+  // Obstacles
+  ctx.fillStyle=obstacleColor;
+  obstacles.forEach(o=>{
+    ctx.fillRect(o.x, o.y, o.width, o.height);
+    o.y += speed;
+  });
+
+  // Collision detection
+  for(let o of obstacles){
+    if(car.x < o.x+o.width && car.x+car.width>o.x &&
+       car.y < o.y+o.height && car.y+car.height>o.y){
+         alert('💥 Game Over! Score: '+score);
+         resetGame();
+         return;
+    }
+  }
+
+  // Remove off-screen obstacles
+  obstacles = obstacles.filter(o=>o.y<canvas.height);
+
+  requestAnimationFrame(update);
+}
+
+// Update game state
+function update(){
+  // Smooth car movement to mouse
+  const carCenter = car.x + car.width/2;
+  const diff = targetX - carCenter;
+  car.x += diff * 0.15; // smooth factor
+
+  // Keep car in road
+  if(car.x < roadX) car.x=roadX;
+  if(car.x+car.width > roadX+roadWidth) car.x=roadX+roadWidth-car.width;
+
+  // Randomly spawn obstacles
+  if(Math.random()<0.02) spawnObstacle();
+
+  // Update score
+  score++;
+  document.getElementById('score').innerText = 'Score: '+score;
+
+  draw();
+}
+
+function resetGame(){
+  score=0;
+  car.x = canvas.width/2 - 15;
+  obstacles=[];
+  lines.forEach((l,i)=>l.y=i*50);
+}
+
+// Start game
+update();
+</script>
+
+</body>
+</html>
