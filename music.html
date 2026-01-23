@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beat Blaster</title>
+<style>
+:root{
+  --bg:#070b18;
+  --lane:#101935;
+  --noteA:#ff4d6d;
+  --noteS:#21c87a;
+  --noteD:#00f7ff;
+  --noteF:#ffdd00;
+  --score-color:#00f7ff;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;font-family:Segoe UI,sans-serif;}
+
+body{
+  background:var(--bg);
+  color:white;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  flex-direction:column;
+  min-height:100vh;
+}
+
+h1{
+  margin:20px;
+  background:linear-gradient(90deg,#00f7ff,#6affb3);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  text-align:center;
+}
+
+#score{
+  font-size:1.3rem;
+  margin-bottom:10px;
+  color:var(--score-color);
+}
+
+#gameCanvas{
+  background:var(--lane);
+  border-radius:15px;
+  box-shadow:0 0 20px rgba(0,247,255,0.3);
+  touch-action: none;
+}
+</style>
+</head>
+<body>
+
+<h1>Beat Blaster</h1>
+<div id="score">Score: 0</div>
+<canvas id="gameCanvas" width="300" height="500"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+const lanes = ['A','S','D','F'];
+const laneColors = {'A':'#ff4d6d','S':'#21c87a','D':'#00f7ff','F':'#ffdd00'};
+const laneWidth = canvas.width/4;
+let score = 0;
+
+// Smooth note speed
+const noteSpeed = 3.5;
+
+// Note class
+class Note{
+  constructor(lane){
+    this.lane = lane;
+    this.x = lanes.indexOf(lane)*laneWidth + laneWidth/2 - 15;
+    this.y = -30;
+    this.hit=false;
+    this.alpha = 0.8; // neon glow effect
+  }
+  update(){
+    this.y += noteSpeed;
+    this.alpha = Math.min(1, this.alpha+0.01);
+  }
+  draw(){
+    ctx.save();
+    ctx.globalAlpha = this.alpha;
+    ctx.shadowColor = laneColors[this.lane];
+    ctx.shadowBlur = 15;
+    ctx.fillStyle = laneColors[this.lane];
+    ctx.fillRect(this.x,this.y,30,30);
+    ctx.restore();
+  }
+}
+
+// Game variables
+let notes = [];
+let lastSpawn=0;
+
+// Draw lanes
+function drawLanes(){
+  for(let i=0;i<4;i++){
+    ctx.strokeStyle='rgba(0,247,255,0.3)';
+    ctx.lineWidth=2;
+    ctx.strokeRect(i*laneWidth,0,laneWidth,canvas.height);
+    ctx.font='20px Segoe UI';
+    ctx.fillStyle='white';
+    ctx.textAlign='center';
+    ctx.fillText(lanes[i],i*laneWidth+laneWidth/2,480);
+  }
+}
+
+// Game loop
+let lastTime = 0;
+function update(time){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawLanes();
+
+  // Spawn note every ~800ms
+  if(time - lastSpawn > 800){
+    spawnNote();
+    lastSpawn = time;
+  }
+
+  // Update & draw notes
+  notes.forEach(note=>{
+    note.update();
+    note.draw();
+  });
+
+  // Remove off-screen or hit notes
+  notes = notes.filter(note=>note.y<canvas.height && !note.hit);
+
+  requestAnimationFrame(update);
+}
+update();
+
+// Spawn note randomly
+function spawnNote(){
+  const lane = lanes[Math.floor(Math.random()*4)];
+  notes.push(new Note(lane));
+}
+
+// Handle hits
+function handleHit(key){
+  const hitZone = canvas.height - 60;
+  notes.forEach(note=>{
+    if(!note.hit && note.lane===key && Math.abs(note.y - hitZone)<25){
+      note.hit=true;
+      score+=10;
+      document.getElementById('score').innerText='Score: '+score;
+    }
+  });
+}
+
+// Keyboard input
+document.addEventListener('keydown',e=>{
+  handleHit(e.key.toUpperCase());
+});
+
+// Mobile touch support (split canvas into 4 zones)
+canvas.addEventListener('touchstart',e=>{
+  const rect = canvas.getBoundingClientRect();
+  const touchX = e.touches[0].clientX - rect.left;
+  const laneIndex = Math.floor(touchX/laneWidth);
+  handleHit(lanes[laneIndex]);
+});
+</script>
+
+</body>
+</html>
