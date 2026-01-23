@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cyber Invaders: Pattern Shift 🌌</title>
+    <style>
+        :root { --neon: #00f7ff; --pink: #ff3cac; --gold: #ffcc00; --orange: #ff7700; --bg: #02040a; }
+        body { background: var(--bg); margin: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: 'Courier New', monospace; touch-action: none; }
+        .ui { position: absolute; top: 15px; width: min(90vw, 420px); color: var(--neon); font-weight: bold; pointer-events: none; z-index: 10; }
+        .stats { display: flex; justify-content: space-between; margin-bottom: 5px; }
+        #timer-bar { width: 0%; height: 4px; background: var(--pink); transition: width 0.1s linear; box-shadow: 0 0 10px var(--pink); }
+        #game-box { position: relative; border: 2px solid var(--neon); border-radius: 15px; overflow: hidden; }
+        canvas { display: block; background: #050814; }
+        .over { position: absolute; inset: 0; background: rgba(0,0,0,0.9); display: none; flex-direction: column; justify-content: center; align-items: center; color: white; z-index: 20; text-align: center; }
+        button { background: var(--pink); color: white; border: none; padding: 12px 30px; border-radius: 50px; cursor: pointer; font-weight: bold; margin-top: 20px; box-shadow: 0 0 15px var(--pink); text-transform: uppercase; }
+    </style>
+</head>
+<body>
+
+    <div class="ui">
+        <div class="stats">
+            <div id="sc">SCORE: 0</div>
+            <div id="se">SEC: 1</div>
+        </div>
+        <div id="timer-bar"></div>
+    </div>
+
+    <div id="game-box">
+        <canvas id="c"></canvas>
+        <div id="over" class="over">
+            <h1 style="color:#ff4d6d">PATTERN FAILED</h1>
+            <button onclick="reset()">REBOOT</button>
+        </div>
+    </div>
+
+<script>
+    const cvs = document.getElementById('c');
+    const ctx = cvs.getContext('2d');
+    const over = document.getElementById('over');
+    const tBar = document.getElementById('timer-bar');
+    
+    const W = Math.min(window.innerWidth - 20, 420);
+    const H = 550;
+    cvs.width = W; cvs.height = H;
+
+    let score = 0, sector = 1, alive = true;
+    let px = W/2, tx = W/2;
+    let enemies = [], bullets = [], specials = [];
+    let waveY = -100, tick = 0, pType = 0, pTime = 0, maxPTime = 200;
+
+    function reset() {
+        score = 0; sector = 1; alive = true; pType = 0; pTime = 0;
+        enemies = []; bullets = []; specials = [];
+        over.style.display = 'none';
+        tBar.style.width = "0%";
+        spawn();
+        loop();
+    }
+
+    function spawn() {
+        waveY = -150;
+        enemies = [];
+        const rows = 5;
+        const cols = 7;
+        const spacingX = W / 8;
+        const spacingY = 45;
+        
+        // Pattern Selection Logic
+        const patternType = sector % 4; 
+
+        for(let r=0; r<rows; r++) {
+            for(let c=0; c<cols; c++) {
+                let ox = (c + 1) * spacingX - (W / 2);
+                let oy = r * spacingY;
+
+                // Pattern 1: V-Shape
+                if(patternType === 1) {
+                    oy += Math.abs(c - 3) * 30;
+                } 
+                // Pattern 2: Diamond
+                else if(patternType === 2) {
+                    oy += (Math.abs(c - 3) + Math.abs(r - 2)) * 15;
+                }
+                // Pattern 3: Double Columns
+                else if(patternType === 3) {
+                    if(c === 3) continue; // Gap in middle
+                    ox += (c < 3) ? -20 : 20;
+                }
+
+                enemies.push({ ox, oy, alive: true });
+            }
+        }
+    }
+
+    function addSpec() {
+        specials.push({ x: -30, y: 80, type: Math.random() > 0.5 ? 1 : 2, active: true });
+    }
+
+    window.addEventListener('mousemove', e => tx = e.clientX - cvs.getBoundingClientRect().left);
+    window.addEventListener('touchmove', e => {
+        e.preventDefault();
+        tx = e.touches[0].clientX - cvs.getBoundingClientRect().left;
+    }, {passive: false});
+
+    function loop() {
+        if(!alive) return;
+
+        px += (tx - px) * 0.25;
+        tick++;
+        
+        if(tick > (pType > 0 ? 7 : 15)) {
+            if(pType === 1) [-1.8, 0, 1.8].forEach(v => bullets.push({x: px, y: 480, vx: v}));
+            else if(pType === 2) [-3.5, -2.1, -0.7, 0.7, 2.1, 3.5].forEach(v => bullets.push({x: px, y: 480, vx: v}));
+            else bullets.push({x: px, y: 480, vx: 0});
+            
+            if(pTime > 0) {
+                pTime--;
+                tBar.style.width = (pTime / maxPTime * 100) + "%";
+                tBar.style.backgroundColor = pType === 1 ? "var(--orange)" : "var(--gold)";
+            } else { pType = 0; tBar.style.width = "0%"; }
+            tick = 0;
+        }
+
+        ctx.fillStyle = '#050814';
+        ctx.fillRect(0, 0, W, H);
+
+        let pColor = pType === 1 ? '#ff7700' : (pType === 2 ? '#ffcc00' : '#00f7ff');
+        ctx.shadowBlur = 15; ctx.shadowColor = pColor;
+        ctx.fillStyle = pColor;
+        ctx.beginPath(); ctx.moveTo(px, 495); ctx.lineTo(px-15, 525); ctx.lineTo(px+15, 525); ctx.fill();
+
+        // Wave Dynamics (Sway speed increases with sector)
+        waveY += 0.5 + (sector * 0.08);
+        const swayAmount = 40 + (sector * 5);
+        const waveX = (W/2) + Math.sin(Date.now() / (800 - (sector * 10))) * swayAmount;
+
+        enemies = enemies.filter(e => {
+            const ex = waveX + e.ox; const ey = waveY + e.oy;
+            ctx.shadowBlur = 10; ctx.shadowColor = '#ff4d6d';
+            ctx.fillStyle = '#ff4d6d';
+            ctx.fillRect(ex-12, ey-10, 24, 20);
+            if(ey > 490 && Math.abs(ex - px) < 22) alive = false;
+            if(ey > H) alive = false;
+            return e.alive;
+        });
+
+        if(Math.random() < 0.004 && specials.length === 0) addSpec();
+        specials = specials.filter(s => {
+            s.x += 4;
+            ctx.shadowBlur = 20;
+            ctx.fillStyle = s.type === 1 ? '#ff7700' : '#ffcc00';
+            ctx.shadowColor = ctx.fillStyle;
+            ctx.beginPath(); ctx.arc(s.x, s.y, 14, 0, Math.PI*2); ctx.fill();
+            return s.active && s.x < W + 50;
+        });
+
+        bullets = bullets.filter(b => {
+            b.y -= 13; b.x += b.vx;
+            ctx.shadowBlur = 5; ctx.shadowColor = '#6affb3';
+            ctx.fillStyle = '#6affb3';
+            ctx.fillRect(b.x-1.5, b.y, 3, 15);
+
+            enemies.forEach(e => {
+                const ex = waveX + e.ox; const ey = waveY + e.oy;
+                if(e.alive && Math.abs(b.x - ex) < 20 && Math.abs(b.y - ey) < 20) {
+                    e.alive = false; b.hit = true; score += 10;
+                }
+            });
+
+            specials.forEach(s => {
+                if(s.active && Math.abs(b.x - s.x) < 25 && Math.abs(b.y - s.y) < 25) {
+                    s.active = false; b.hit = true;
+                    pType = s.type; pTime = maxPTime; score += 100;
+                }
+            });
+            return b.y > 0 && !b.hit;
+        });
+
+        document.getElementById('sc').innerText = `SCORE: ${score}`;
+        document.getElementById('se').innerText = `SEC: ${sector}`;
+        
+        if(enemies.length === 0) { sector++; spawn(); }
+        if(!alive) over.style.display = 'flex';
+        requestAnimationFrame(loop);
+    }
+
+    reset();
+</script>
+</body>
+</html>
