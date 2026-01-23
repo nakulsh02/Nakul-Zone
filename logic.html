@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Code Breaker 🕹️</title>
+<style>
+:root{
+  --bg:#070b18;
+  --card:#101935;
+  --neon:#00f7ff;
+  --correct:#21c87a;
+  --partial:#ffdd00;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;font-family:Segoe UI,sans-serif;}
+
+body{
+  background:var(--bg);
+  color:white;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  flex-direction:column;
+  min-height:100vh;
+  text-align:center;
+}
+
+h1{
+  margin-bottom:20px;
+  background:linear-gradient(90deg,#00f7ff,#6affb3);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+
+#game{
+  background:var(--card);
+  padding:20px;
+  border-radius:20px;
+  box-shadow:0 0 30px rgba(0,247,255,0.2);
+  width:100%;
+  max-width:350px;
+}
+
+input[type="text"]{
+  width:80%;
+  padding:12px;
+  border-radius:12px;
+  border:2px solid var(--neon);
+  background:transparent;
+  color:white;
+  font-size:1.2rem;
+  margin-bottom:10px;
+}
+
+button{
+  width:84%;
+  padding:12px;
+  border-radius:12px;
+  border:2px solid var(--neon);
+  background:transparent;
+  color:var(--neon);
+  font-size:1.2rem;
+  cursor:pointer;
+  margin-bottom:15px;
+  transition:0.2s;
+}
+
+button:hover{
+  background:var(--neon);
+  color:#101935;
+}
+
+#history{
+  display:flex;
+  flex-direction:column-reverse;
+  align-items:center;
+  gap:5px;
+  max-height:300px;
+  overflow-y:auto;
+}
+
+.guessRow{
+  display:flex;
+  justify-content:center;
+  gap:5px;
+}
+
+.guessCell{
+  width:35px;
+  height:35px;
+  line-height:35px;
+  border-radius:6px;
+  background:#0c1430;
+  color:white;
+  font-weight:bold;
+  text-align:center;
+}
+
+.correct{background:var(--correct);}
+.partial{background:var(--partial);}
+</style>
+</head>
+<body>
+
+<h1>Code Breaker 🕹️</h1>
+<div id="game">
+  <input type="text" id="guessInput" maxlength="4" placeholder="Enter 4-digit code">
+  <br>
+  <button onclick="checkGuess()">Submit Guess</button>
+  <div id="history"></div>
+</div>
+
+<script>
+let secretCode = generateCode();
+let historyDiv = document.getElementById('history');
+
+function generateCode(){
+  let code = '';
+  for(let i=0;i<4;i++){
+    code += Math.floor(Math.random()*10);
+  }
+  return code;
+}
+
+function checkGuess(){
+  const guess = document.getElementById('guessInput').value;
+  if(guess.length!==4){
+    alert('Enter exactly 4 digits!');
+    return;
+  }
+
+  let correctPos = 0;
+  let codeArr = secretCode.split('');
+  let guessArr = guess.split('');
+
+  // Count correct position & remove matched
+  guessArr.forEach((v,i)=>{
+    if(v===codeArr[i]){
+      correctPos++;
+      codeArr[i]=null;
+      guessArr[i]=null;
+    }
+  });
+
+  // Display row
+  const row = document.createElement('div');
+  row.classList.add('guessRow');
+
+  for(let i=0;i<4;i++){
+    const cell = document.createElement('div');
+    cell.classList.add('guessCell');
+    cell.innerText = guess[i];
+    // Green = correct pos
+    if(guess[i]===secretCode[i]) cell.classList.add('correct');
+    // Yellow = correct digit wrong pos
+    else if(secretCode.includes(guess[i])) cell.classList.add('partial');
+    row.appendChild(cell);
+  }
+
+  historyDiv.prepend(row);
+  document.getElementById('guessInput').value='';
+
+  if(correctPos===4){
+    alert('🎉 You cracked the code! The code was: '+secretCode);
+    secretCode = generateCode(); // new code every round
+    historyDiv.innerHTML=''; // clear history
+  }
+}
+</script>
+
+</body>
+</html>
