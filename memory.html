@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Memory Master 🧩</title>
+<style>
+:root{
+  --neon:#00f7ff;
+  --bg:#070b18;
+  --card:#101935;
+  --matched:#21c87a;
+  --wrong:#ff4d6d;
+}
+
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+  font-family:Segoe UI,sans-serif;
+}
+
+body{
+  min-height:100vh;
+  background:radial-gradient(circle at top,#1a2550,var(--bg));
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  color:white;
+  flex-direction:column;
+}
+
+h1{
+  margin-bottom:20px;
+  background:linear-gradient(90deg,#00f7ff,#6affb3);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+
+#moves{
+  margin-bottom:15px;
+  color:var(--neon);
+  font-size:1.2rem;
+}
+
+.board{
+  display:grid;
+  grid-template-columns:repeat(4, 80px);
+  grid-gap:15px;
+}
+
+.card{
+  width:80px;
+  height:80px;
+  background:var(--card);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  border-radius:12px;
+  cursor:pointer;
+  font-size:2rem;
+  color:var(--neon);
+  box-shadow:0 0 15px rgba(0,247,255,.3);
+  transition:0.3s;
+  user-select:none;
+}
+
+.card.flipped, .card.matched{
+  background:var(--matched);
+  color:#fff;
+  box-shadow:0 0 20px var(--matched);
+}
+
+.card.wrong{
+  background:var(--wrong);
+  color:#fff;
+  box-shadow:0 0 20px var(--wrong);
+}
+</style>
+</head>
+<body>
+
+<h1>Memory Master 🧩</h1>
+<div id="moves">Moves: 0</div>
+<div class="board" id="board"></div>
+
+<script>
+const board = document.getElementById('board');
+const movesDisplay = document.getElementById('moves');
+
+let firstCard = null;
+let secondCard = null;
+let lockBoard = false;
+let moves = 0;
+
+// Neon-style emojis for matching
+const emojis = ['🔵','🟢','🟡','🟠','🟣','🔺','⭐','❤️','💎','🌀','🌟','⚡'];
+// Duplicate for pairs
+let cardsArray = [...emojis, ...emojis];
+
+// Shuffle function
+function shuffle(array){
+  for(let i=array.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [array[i],array[j]]=[array[j],array[i]];
+  }
+  return array;
+}
+
+// Create board dynamically
+function createBoard(){
+  board.innerHTML='';
+  cardsArray = shuffle(cardsArray);
+  cardsArray.forEach((emoji)=>{
+    const card = document.createElement('div');
+    card.classList.add('card');
+    card.dataset.value = emoji;
+    card.innerText = '';
+    card.addEventListener('click', flipCard);
+    board.appendChild(card);
+  });
+}
+
+// Flip card logic
+function flipCard(){
+  if(lockBoard) return;
+  if(this===firstCard) return;
+
+  this.classList.add('flipped');
+  this.innerText = this.dataset.value;
+
+  if(!firstCard){
+    firstCard = this;
+    return;
+  }
+
+  secondCard = this;
+  lockBoard = true;
+  moves++;
+  movesDisplay.innerText = 'Moves: '+moves;
+
+  checkMatch();
+}
+
+function checkMatch(){
+  if(firstCard.dataset.value === secondCard.dataset.value){
+    firstCard.classList.add('matched');
+    secondCard.classList.add('matched');
+    resetBoard();
+    checkWin();
+  } else {
+    setTimeout(()=>{
+      firstCard.classList.add('wrong');
+      secondCard.classList.add('wrong');
+      setTimeout(()=>{
+        firstCard.classList.remove('flipped','wrong');
+        secondCard.classList.remove('flipped','wrong');
+        firstCard.innerText='';
+        secondCard.innerText='';
+        resetBoard();
+      },500);
+    },300);
+  }
+}
+
+function resetBoard(){
+  [firstCard, secondCard] = [null, null];
+  lockBoard = false;
+}
+
+function checkWin(){
+  const matchedCards = document.querySelectorAll('.card.matched');
+  if(matchedCards.length === cardsArray.length){
+    setTimeout(()=>{
+      alert(`🎉 Congratulations! You finished in ${moves} moves!`);
+      moves = 0;
+      movesDisplay.innerText = 'Moves: 0';
+      createBoard();
+    },300);
+  }
+}
+
+// Initialize game
+createBoard();
+</script>
+
+</body>
+</html>
