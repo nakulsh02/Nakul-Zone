@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cyber Quest: Infinite 🌃</title>
+
+<style>
+:root{
+  --bg:#050814;
+  --neon:#00f7ff;
+  --pink:#ff3cac;
+  --green:#6affb3;
+  --danger:#ff4d6d;
+}
+
+*{box-sizing:border-box;margin:0;padding:0;font-family:Segoe UI,sans-serif}
+
+body{
+  background:radial-gradient(circle at top,#141b3f,var(--bg));
+  height:100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  color:white;
+  overflow:hidden;
+}
+
+.game{
+  width:min(95vw,420px);
+  background:#0b1230;
+  border-radius:22px;
+  box-shadow:0 0 45px rgba(0,247,255,.3);
+  padding:14px;
+  position:relative;
+}
+
+h1{
+  text-align:center;
+  margin-bottom:6px;
+  background:linear-gradient(90deg,var(--neon),var(--pink));
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+
+.status{text-align:center;font-size:1rem;font-weight:bold;color:var(--green);margin-bottom:8px; height: 1.2em;}
+
+/* MINIMAP */
+.minimap{
+  margin:6px auto 12px;
+  width:120px;
+  height:100px;
+  background:rgba(5, 8, 20, 0.8);
+  border:2px solid var(--neon);
+  border-radius:10px;
+  box-shadow:0 0 15px rgba(0,247,255,.2);
+  position:relative;
+  overflow: hidden;
+}
+
+.miniplayer, .miniorb, .minienemy{
+  position:absolute;
+  border-radius:50%;
+  transform: translate(-50%, -50%);
+}
+
+.miniplayer{width:6px;height:6px;background:var(--neon); z-index: 10;}
+.miniorb{width:4px;height:4px;background:var(--green);}
+.minienemy{width:4px;height:4px;background:var(--danger);}
+
+.viewport{
+  position:relative;
+  width:100%;
+  aspect-ratio:1/1;
+  overflow:hidden;
+  border-radius:18px;
+  border:2px solid var(--neon);
+  cursor: crosshair;
+}
+
+.world{
+  position:absolute;
+  width:100%;
+  height:3000px;
+  background:
+    repeating-linear-gradient(0deg,rgba(15, 26, 58, 0.5) 0 2px,transparent 2px 50px),
+    repeating-linear-gradient(90deg,rgba(15, 26, 58, 0.5) 0 2px,transparent 2px 50px),
+    radial-gradient(circle at center,#101a40,#050814);
+}
+
+.player{
+  position:absolute;
+  width:26px;height:26px;
+  border-radius:50%;
+  background:var(--neon);
+  box-shadow:0 0 15px var(--neon);
+  transform:translate(-50%,-50%);
+  z-index: 5;
+}
+
+.orb{
+  position:absolute;
+  width:18px;height:18px;
+  border-radius:50%;
+  background:var(--green);
+  box-shadow:0 0 12px var(--green);
+  transform:translate(-50%,-50%);
+}
+
+.enemy{
+  position:absolute;
+  width:24px;height:24px;
+  border-radius:50%;
+  background:var(--danger);
+  box-shadow:0 0 16px var(--danger);
+  transform:translate(-50%,-50%);
+}
+
+/* Transitions */
+#transition-flash {
+  position: absolute;
+  top:0; left:0; width:100%; height:100%;
+  background: white;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 100;
+  transition: opacity 0.4s ease-out;
+}
+
+.mission-text{
+  margin-top:10px;
+  text-align:center;
+  font-size:.85rem;
+  color:#b9f7ff;
+}
+
+#retryBtn {
+    display: none;
+    margin: 10px auto 0;
+    padding: 8px 16px;
+    background: var(--pink);
+    border: none;
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    box-shadow: 0 0 10px var(--pink);
+}
+</style>
+</head>
+
+<body>
+
+<div class="game">
+  <div id="transition-flash"></div>
+  <h1>Cyber Quest 🌃</h1>
+  <div class="status" id="status">INITIATING...</div>
+
+  <div class="minimap" id="minimap">
+    <div class="miniplayer" id="miniplayer"></div>
+  </div>
+
+  <div class="viewport" id="viewport">
+    <div class="world" id="world">
+      <div class="player" id="player"></div>
+    </div>
+  </div>
+
+  <div class="mission-text" id="mission"></div>
+  <button id="retryBtn" onclick="resetGame()">SYSTEM REBOOT</button>
+</div>
+
+<script>
+const viewport = document.getElementById("viewport");
+const world = document.getElementById("world");
+const player = document.getElementById("player");
+const minimap = document.getElementById("minimap");
+const miniPlayer = document.getElementById("miniplayer");
+const statusEl = document.getElementById("status");
+const missionEl = document.getElementById("mission");
+const retryBtn = document.getElementById("retryBtn");
+const flash = document.getElementById("transition-flash");
+
+const WORLD_HEIGHT = 3000;
+const MAP_W = 120;
+const MAP_H = 100;
+
+let px, py, tx, ty, collected, goal, isGameOver, enemies, orbs;
+let sector = 1;
+
+function initAssembly() {
+    // Clear previous entities
+    document.querySelectorAll('.orb, .enemy, .miniorb, .minienemy').forEach(el => el.remove());
+    
+    // Reset player position for new mission
+    px = viewport.clientWidth / 2;
+    py = WORLD_HEIGHT - 100;
+    tx = px; ty = py;
+    
+    collected = 0;
+    isGameOver = false;
+    enemies = [];
+    orbs = [];
+    
+    // Every time is a different assembly
+    goal = Math.floor(Math.random() * 4) + 3; // 3 to 6 orbs
+    let droneCount = 5 + Math.floor(sector * 1.5); // More drones as sectors increase
+    
+    statusEl.textContent = `SECTOR: ${sector}`;
+    statusEl.style.color = "var(--green)";
+    missionEl.textContent = `Retrieve ${goal} Data Fragments to Warp`;
+    retryBtn.style.display = "none";
+    player.style.background = "var(--neon)";
+    player.style.opacity = "1";
+
+    // Randomize Orbs
+    for(let i=0; i<goal; i++){
+        const o = {
+            x: Math.random() * (viewport.clientWidth - 40) + 20,
+            y: Math.random() * (WORLD_HEIGHT - 600) + 100, // Keep some space at bottom
+            el: document.createElement("div"),
+            mini: document.createElement("div")
+        };
+        o.el.className = "orb";
+        o.el.style.left = o.x + "px";
+        o.el.style.top = o.y + "px";
+        world.appendChild(o.el);
+        o.mini.className = "miniorb";
+        minimap.appendChild(o.mini);
+        orbs.push(o);
+    }
+
+    // Randomize Drones (Red Enemies)
+    for(let i=0; i<droneCount; i++){
+        const e = {
+            x: Math.random() * (viewport.clientWidth - 40) + 20,
+            y: Math.random() * (WORLD_HEIGHT - 800) + 200,
+            speed: 1 + Math.random() * 2 + (sector * 0.1),
+            dir: Math.random() > 0.5 ? 1 : -1,
+            el: document.createElement("div"),
+            mini: document.createElement("div")
+        };
+        e.el.className = "enemy";
+        e.el.style.left = e.x + "px";
+        e.el.style.top = e.y + "px";
+        world.appendChild(e.el);
+        e.mini.className = "minienemy";
+        minimap.appendChild(e.mini);
+        enemies.push(e);
+    }
+
+    // Warp Flash Effect
+    flash.style.opacity = "0.8";
+    setTimeout(() => flash.style.opacity = "0", 400);
+}
+
+function resetGame() {
+    sector = 1;
+    initAssembly();
+}
+
+function loop(){
+    if(!isGameOver) {
+        // Smooth Movement
+        px += (tx - px) * 0.12;
+        py += (ty - py) * 0.12;
+        py = Math.max(20, Math.min(WORLD_HEIGHT - 20, py));
+
+        player.style.left = px + "px";
+        player.style.top = py + "px";
+        
+        // Scroll Camera
+        world.style.transform = `translateY(${-(py - viewport.clientHeight/2)}px)`;
+
+        // Minimap Sync
+        miniPlayer.style.left = (px / viewport.clientWidth * MAP_W) + "px";
+        miniPlayer.style.top = (py / WORLD_HEIGHT * MAP_H) + "px";
+
+        // Handle Orbs
+        orbs.forEach((o, i) => {
+            o.mini.style.left = (o.x / viewport.clientWidth * MAP_W) + "px";
+            o.mini.style.top = (o.y / WORLD_HEIGHT * MAP_H) + "px";
+
+            if(Math.hypot(px - o.x, py - o.y) < 22){
+                o.el.remove();
+                o.mini.remove();
+                orbs.splice(i, 1);
+                collected++;
+                statusEl.textContent = `Fragment ${collected}/${goal}`;
+                
+                // MISSION COMPLETE: AUTO RE-ASSEMBLE
+                if(collected === goal){
+                    isGameOver = true;
+                    sector++;
+                    statusEl.textContent = "WARP DRIVE ACTIVE...";
+                    setTimeout(initAssembly, 1000);
+                }
+            }
+        });
+
+        // Handle Drones
+        enemies.forEach(e => {
+            e.y += e.dir * e.speed;
+            if(e.y < 50 || e.y > WORLD_HEIGHT - 50) e.dir *= -1;
+            e.el.style.top = e.y + "px";
+
+            e.mini.style.left = (e.x / viewport.clientWidth * MAP_W) + "px";
+            e.mini.style.top = (e.y / WORLD_HEIGHT * MAP_H) + "px";
+
+            // Collision (TOUCH RED = FAIL)
+            if(Math.hypot(px - e.x, py - e.y) < 22){
+                isGameOver = true;
+                statusEl.textContent = "SYSTEM CRASH: HIT DETECTED";
+                statusEl.style.color = "var(--danger)";
+                player.style.opacity = "0.3";
+                retryBtn.style.display = "block";
+            }
+        });
+    }
+    requestAnimationFrame(loop);
+}
+
+// Controls
+function move(x, y) {
+    if(isGameOver) return;
+    const r = viewport.getBoundingClientRect();
+    tx = x - r.left;
+    ty = py + (y - r.top - viewport.clientHeight/2);
+}
+
+viewport.addEventListener("mousemove", e => move(e.clientX, e.clientY));
+viewport.addEventListener("touchmove", e => {
+    e.preventDefault();
+    move(e.touches[0].clientX, e.touches[0].clientY);
+}, {passive: false});
+
+// Start the game
+initAssembly();
+loop();
+</script>
+
+</body>
+</html>
