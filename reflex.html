@@ -3,140 +3,160 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reflex Master ⚡</title>
+<title>F1 Neon Reaction Test</title>
 <style>
-:root{
-  --neon:#00f7ff;
-  --bg:#070b18;
-  --ready:#1a73ff;
-  --hit:#21c87a;
-  --miss:#ff4d6d;
-  --button:#101935;
-}
+  body {
+    margin: 0;
+    background-color: #050505; /* Deep black */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    user-select: none;
+    cursor: pointer;
+  }
 
-*{
-  margin:0;
-  padding:0;
-  box-sizing:border-box;
-  font-family:Segoe UI,sans-serif;
-}
+  #game-container {
+    background-color: #121212;
+    padding: 50px;
+    border-radius: 12px;
+    border: 1px solid #222;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    text-align: center;
+    width: 95%;
+    max-width: 550px;
+  }
 
-body{
-  min-height:100vh;
-  background:radial-gradient(circle at top,#1a2550,var(--bg));
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  color:white;
-  flex-direction:column;
-}
+  /* The 5 Light Columns */
+  .lights-row {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 40px;
+  }
 
-h1{
-  margin-bottom:20px;
-  background:linear-gradient(90deg,#00f7ff,#6affb3);
-  -webkit-background-clip:text;
-  -webkit-text-fill-color:transparent;
-  text-align:center;
-}
+  .light-column {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: #1a1a1a;
+    padding: 12px 8px;
+    border-radius: 6px;
+    border: 1px solid #333;
+  }
 
-#reactionTime, #bestTime{
-  font-size:1.2rem;
-  color:var(--neon);
-  margin-bottom:15px;
-}
+  .dot {
+    width: 40px;
+    height: 40px;
+    background-color: #222; /* Off state */
+    border-radius: 50%;
+    transition: background 0.05s, box-shadow 0.05s;
+    border: 1px solid #111;
+  }
 
-#gameArea{
-  width:100%;
-  max-width:400px;
-  height:300px;
-  background:var(--bg);
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  border-radius:20px;
-  box-shadow:0 0 40px rgba(0,247,255,0.3);
-  cursor:pointer;
-  transition:0.3s;
-  position:relative;
-}
+  /* F1 Neon Red Light state */
+  .dot.active {
+    background-color: #ff003c;
+    box-shadow: 0 0 15px #ff003c, 0 0 30px #ff003c;
+  }
 
-#reflexBtn{
-  padding:20px 40px;
-  border:none;
-  border-radius:12px;
-  background:var(--button);
-  color:var(--neon);
-  font-size:1.5rem;
-  cursor:pointer;
-  display:none;
-  position:absolute;
-  box-shadow:0 0 20px var(--neon);
-  transition:0.2s all ease;
-}
+  #timer {
+    font-size: 5rem;
+    font-weight: bold;
+    color: #00f2ff; /* Neon Cyan */
+    text-shadow: 0 0 20px rgba(0, 242, 255, 0.5);
+    font-family: 'Courier New', monospace;
+    margin: 20px 0;
+  }
 
-#reflexBtn:hover{
-  transform:scale(1.1);
-}
+  #message {
+    font-size: 0.9rem;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+  }
 </style>
 </head>
-<body>
+<body onmousedown="handleInput()">
 
-<h1>Reflex Master ⚡</h1>
-<div id="reactionTime">Reaction Time: 0 ms</div>
-<div id="bestTime">Best Time: 0 ms</div>
-<div id="gameArea">Click when it turns BLUE!</div>
-<button id="reflexBtn">CLICK!</button>
+<div id="game-container">
+  <div class="lights-row">
+    <div class="light-column"><div class="dot"></div><div class="dot"></div></div>
+    <div class="light-column"><div class="dot"></div><div class="dot"></div></div>
+    <div class="light-column"><div class="dot"></div><div class="dot"></div></div>
+    <div class="light-column"><div class="dot"></div><div class="dot"></div></div>
+    <div class="light-column"><div class="dot"></div><div class="dot"></div></div>
+  </div>
+
+  <div id="timer">00.000</div>
+  <div id="message">Click anywhere to Start</div>
+</div>
 
 <script>
-const gameArea = document.getElementById('gameArea');
-const reflexBtn = document.getElementById('reflexBtn');
-const reactionTimeDisplay = document.getElementById('reactionTime');
-const bestTimeDisplay = document.getElementById('bestTime');
-
-let startTime = 0;
-let bestTime = 0;
-let waiting = false;
-let ready = false;
-
-// Start a new round
-function startRound(){
-  reflexBtn.style.display='none';
-  gameArea.style.background='#101935';
-  gameArea.innerText = 'Wait for BLUE...';
-  ready = false;
+  const dots = document.querySelectorAll('.dot');
+  const timerDisplay = document.getElementById('timer');
+  const message = document.getElementById('message');
   
-  const delay = Math.random()*2000 + 1000; // 1-3 seconds
-  waiting = setTimeout(()=>{
-    gameArea.style.background='#1a73ff'; // ready to click
-    gameArea.innerText = 'CLICK NOW!';
-    startTime = performance.now();
-    ready = true;
-  }, delay);
-}
+  let state = 'IDLE'; 
+  let startTime;
+  let timeouts = [];
 
-// Handle click
-gameArea.addEventListener('click', ()=>{
-  if(!ready){
-    // Clicked too early
-    clearTimeout(waiting);
-    gameArea.style.background='#ff4d6d';
-    gameArea.innerText='Too Soon! Wait for BLUE';
-    setTimeout(startRound,1000);
-  } else {
-    const reaction = Math.round(performance.now() - startTime);
-    reactionTimeDisplay.innerText = `Reaction Time: ${reaction} ms`;
-    if(bestTime === 0 || reaction < bestTime){
-      bestTime = reaction;
-      bestTimeDisplay.innerText = `Best Time: ${bestTime} ms`;
+  function handleInput() {
+    if (state === 'IDLE' || state === 'RESULT' || state === 'JUMP') {
+      startSequence();
+    } else if (state === 'LIGHTING' || state === 'WAITING') {
+      jumpStart();
+    } else if (state === 'READY') {
+      finish();
     }
-    gameArea.style.background='#21c87a';
-    gameArea.innerText='Good Job!';
-    setTimeout(startRound,1000);
   }
-});
 
-// Start first round
-startRound();
+  function startSequence() {
+    state = 'LIGHTING';
+    message.innerText = "Hold for lights out";
+    timerDisplay.innerText = "00.000";
+    
+    dots.forEach(d => d.classList.remove('active'));
+    timeouts.forEach(clearTimeout);
+    timeouts = [];
+
+    for (let i = 0; i < 5; i++) {
+      timeouts.push(setTimeout(() => {
+        dots[i*2].classList.add('active');
+        dots[i*2 + 1].classList.add('active');
+        
+        if (i === 4) {
+          state = 'WAITING';
+          waitForOut();
+        }
+      }, (i + 1) * 800)); // Slightly faster interval for more intensity
+    }
+  }
+
+  function waitForOut() {
+    const randomDelay = Math.random() * 3000 + 1000;
+    timeouts.push(setTimeout(() => {
+      state = 'READY';
+      dots.forEach(d => d.classList.remove('active'));
+      startTime = performance.now();
+    }, randomDelay));
+  }
+
+  function finish() {
+    const endTime = performance.now();
+    const result = ((endTime - startTime) / 1000).toFixed(3);
+    state = 'RESULT';
+    timerDisplay.innerText = result;
+    message.innerText = "Reaction Time / Click to restart";
+  }
+
+  function jumpStart() {
+    timeouts.forEach(clearTimeout);
+    state = 'JUMP';
+    message.innerText = "JUMP START! Too early";
+    dots.forEach(d => d.classList.remove('active'));
+  }
 </script>
 
 </body>
