@@ -2,168 +2,312 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Beat Blaster</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>BEAT BLASTER ULTRA</title>
 <style>
-:root{
-  --bg:#070b18;
-  --lane:#101935;
-  --noteA:#ff4d6d;
-  --noteS:#21c87a;
-  --noteD:#00f7ff;
-  --noteF:#ffdd00;
-  --score-color:#00f7ff;
+:root {
+  --neon-blue: #00f7ff;
+  --neon-pink: #ff007f;
+  --neon-purple: #9d00ff;
+  --bg-dark: #020205;
 }
 
-*{margin:0;padding:0;box-sizing:border-box;font-family:Segoe UI,sans-serif;}
+* { margin:0; padding:0; box-sizing:border-box; font-family: 'Orbitron', sans-serif; }
 
-body{
-  background:var(--bg);
-  color:white;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  flex-direction:column;
-  min-height:100vh;
+body {
+  background: var(--bg-dark);
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  overflow: hidden;
+  user-select: none;
 }
 
-h1{
-  margin:20px;
-  background:linear-gradient(90deg,#00f7ff,#6affb3);
-  -webkit-background-clip:text;
-  -webkit-text-fill-color:transparent;
-  text-align:center;
+/* CRT Scanline Effect Overlay */
+body::after {
+  content: " ";
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%), 
+              linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+  background-size: 100% 4px, 3px 100%;
+  pointer-events: none;
+  z-index: 10;
 }
 
-#score{
-  font-size:1.3rem;
-  margin-bottom:10px;
-  color:var(--score-color);
+.game-container {
+  position: relative;
+  width: 400px; /* Matched to canvas width for perfect symmetry */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-#gameCanvas{
-  background:var(--lane);
-  border-radius:15px;
-  box-shadow:0 0 20px rgba(0,247,255,0.3);
-  touch-action: none;
+.header {
+  text-align: center;
+  z-index: 5;
+  margin-bottom: 10px;
+  width: 100%;
+}
+
+#score {
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: var(--neon-blue);
+  text-shadow: 0 0 15px var(--neon-blue);
+}
+
+#combo-box {
+  height: 30px;
+  font-size: 1.2rem;
+  color: #ffdd00;
+  text-transform: uppercase;
+  margin-top: 5px;
+}
+
+canvas {
+  background: rgba(5, 5, 15, 0.8);
+  border-radius: 4px;
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.9);
+  display: block;
+}
+
+/* Symmetrical Footer Zones */
+.footer-touch-zones {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 0;
+  gap: 10px;
+}
+
+.neon-line {
+  width: 100%; /* Symmetrical width */
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--neon-blue), transparent);
+  box-shadow: 0 0 12px var(--neon-blue);
+  opacity: 0.7;
+}
+
+.footer-keys {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  padding: 5px 25px 0 25px; /* Symmetrical padding */
+  font-weight: bold;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 2px;
+}
+
+.footer-keys span {
+    width: 25%;
+    text-align: center;
 }
 </style>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&display=swap" rel="stylesheet">
 </head>
 <body>
 
-<h1>Beat Blaster</h1>
-<div id="score">Score: 0</div>
-<canvas id="gameCanvas" width="300" height="500"></canvas>
+<div class="game-container">
+    <div class="header">
+        <div id="score">000000</div>
+        <div id="combo-box"></div>
+    </div>
+
+    <canvas id="gameCanvas" width="400" height="600"></canvas>
+
+    <div class="footer-touch-zones">
+        <div class="neon-line"></div>
+        <div class="neon-line" style="width: 80%; opacity: 0.3; height: 1px;"></div>
+        <div class="footer-keys">
+            <span>A</span><span>S</span><span>D</span><span>F</span>
+        </div>
+    </div>
+</div>
 
 <script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 const lanes = ['A','S','D','F'];
-const laneColors = {'A':'#ff4d6d','S':'#21c87a','D':'#00f7ff','F':'#ffdd00'};
-const laneWidth = canvas.width/4;
-let score = 0;
+const laneColors = { 'A':'#ff0055', 'S':'#00ff88', 'D':'#00d9ff', 'F':'#ffff00' };
+const laneWidth = canvas.width / 4;
+const hitZoneY = canvas.height - 110;
 
-// Smooth note speed
-const noteSpeed = 3.5;
+let state = {
+    score: 0,
+    combo: 0,
+    notes: [],
+    judgments: [],
+    activeKeys: { 'A':false, 'S':false, 'D':false, 'F':false },
+    flashIntensity: { 'A':0, 'S':0, 'D':0, 'F':0 },
+    lastSpawn: 0,
+    shake: 0,
+    gridOffset: 0
+};
 
-// Note class
-class Note{
-  constructor(lane){
-    this.lane = lane;
-    this.x = lanes.indexOf(lane)*laneWidth + laneWidth/2 - 15;
-    this.y = -30;
-    this.hit=false;
-    this.alpha = 0.8; // neon glow effect
-  }
-  update(){
-    this.y += noteSpeed;
-    this.alpha = Math.min(1, this.alpha+0.01);
-  }
-  draw(){
-    ctx.save();
-    ctx.globalAlpha = this.alpha;
-    ctx.shadowColor = laneColors[this.lane];
-    ctx.shadowBlur = 15;
-    ctx.fillStyle = laneColors[this.lane];
-    ctx.fillRect(this.x,this.y,30,30);
-    ctx.restore();
-  }
-}
-
-// Game variables
-let notes = [];
-let lastSpawn=0;
-
-// Draw lanes
-function drawLanes(){
-  for(let i=0;i<4;i++){
-    ctx.strokeStyle='rgba(0,247,255,0.3)';
-    ctx.lineWidth=2;
-    ctx.strokeRect(i*laneWidth,0,laneWidth,canvas.height);
-    ctx.font='20px Segoe UI';
-    ctx.fillStyle='white';
-    ctx.textAlign='center';
-    ctx.fillText(lanes[i],i*laneWidth+laneWidth/2,480);
-  }
-}
-
-// Game loop
-let lastTime = 0;
-function update(time){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  drawLanes();
-
-  // Spawn note every ~800ms
-  if(time - lastSpawn > 800){
-    spawnNote();
-    lastSpawn = time;
-  }
-
-  // Update & draw notes
-  notes.forEach(note=>{
-    note.update();
-    note.draw();
-  });
-
-  // Remove off-screen or hit notes
-  notes = notes.filter(note=>note.y<canvas.height && !note.hit);
-
-  requestAnimationFrame(update);
-}
-update();
-
-// Spawn note randomly
-function spawnNote(){
-  const lane = lanes[Math.floor(Math.random()*4)];
-  notes.push(new Note(lane));
-}
-
-// Handle hits
-function handleHit(key){
-  const hitZone = canvas.height - 60;
-  notes.forEach(note=>{
-    if(!note.hit && note.lane===key && Math.abs(note.y - hitZone)<25){
-      note.hit=true;
-      score+=10;
-      document.getElementById('score').innerText='Score: '+score;
+class JudgmentText {
+    constructor(text, x, color) {
+        this.text = text;
+        this.x = x;
+        this.y = hitZoneY - 20;
+        this.opacity = 1;
+        this.color = color;
     }
-  });
+    update() { this.y -= 2; this.opacity -= 0.03; }
 }
 
-// Keyboard input
-document.addEventListener('keydown',e=>{
-  handleHit(e.key.toUpperCase());
+class Note {
+    constructor(lane) {
+        this.lane = lane;
+        this.x = lanes.indexOf(lane) * laneWidth;
+        this.y = -60;
+        this.speed = 9;
+    }
+    update() { this.y += this.speed; }
+    draw() {
+        let grad = ctx.createLinearGradient(0, this.y, 0, this.y + 40);
+        grad.addColorStop(0, laneColors[this.lane]);
+        grad.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad;
+        ctx.fillRect(this.x + 10, this.y - 20, laneWidth - 20, 40);
+
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = laneColors[this.lane];
+        ctx.fillStyle = "white";
+        ctx.beginPath();
+        ctx.roundRect(this.x + 12, this.y, laneWidth - 24, 15, 4);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
+}
+
+function drawGrid() {
+    state.gridOffset = (state.gridOffset + 4) % 40;
+    ctx.strokeStyle = "rgba(0, 247, 255, 0.1)";
+    ctx.lineWidth = 1;
+
+    for(let y = state.gridOffset; y < canvas.height; y += 40) {
+        ctx.beginPath();
+        ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+    }
+
+    lanes.forEach((_, i) => {
+        ctx.beginPath();
+        ctx.moveTo(i * laneWidth, 0); ctx.lineTo(i * laneWidth, canvas.height);
+        ctx.stroke();
+    });
+
+    lanes.forEach((key, i) => {
+        if(state.activeKeys[key] || state.flashIntensity[key] > 0) {
+            let alpha = state.activeKeys[key] ? 0.25 : state.flashIntensity[key];
+            let grad = ctx.createLinearGradient(0, canvas.height, 0, 0);
+            grad.addColorStop(0, laneColors[key]);
+            grad.addColorStop(1, 'transparent');
+            ctx.fillStyle = grad;
+            ctx.globalAlpha = alpha;
+            ctx.fillRect(i * laneWidth, 0, laneWidth, canvas.height);
+            ctx.globalAlpha = 1;
+            state.flashIntensity[key] -= 0.05;
+        }
+    });
+
+    ctx.strokeStyle = "rgba(255,255,255,0.3)";
+    ctx.strokeRect(5, hitZoneY, canvas.width - 10, 40);
+}
+
+function triggerHit(key) {
+    const perfectTreshold = 25;
+    const greatTreshold = 65;
+    let noteIndex = state.notes.findIndex(n => n.lane === key && n.y > hitZoneY - 80 && n.y < hitZoneY + 80);
+
+    if (noteIndex !== -1) {
+        let note = state.notes[noteIndex];
+        let diff = Math.abs(note.y - (hitZoneY + 10));
+        let accuracy = diff < perfectTreshold ? "PERFECT" : "GREAT";
+        state.judgments.push(new JudgmentText(accuracy, note.x + laneWidth/2, accuracy === "PERFECT" ? "#00f7ff" : "#ffffff"));
+        state.combo++;
+        state.score += (accuracy === "PERFECT" ? 250 : 100) * (1 + Math.floor(state.combo/10));
+        state.flashIntensity[key] = 0.5;
+        state.shake = 8;
+        state.notes.splice(noteIndex, 1);
+        updateUI();
+    }
+}
+
+function updateUI() {
+    document.getElementById('score').innerText = state.score.toString().padStart(6, '0');
+    document.getElementById('combo-box').innerText = state.combo > 2 ? `${state.combo} COMBO` : '';
+}
+
+function mainLoop(time) {
+    if(state.shake > 0) {
+        canvas.style.transform = `translate(${(Math.random()-0.5)*state.shake}px, ${(Math.random()-0.5)*state.shake}px)`;
+        state.shake *= 0.9;
+    }
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawGrid();
+
+    if(time - state.lastSpawn > Math.max(200, 550 - (state.score/500))) {
+        state.notes.push(new Note(lanes[Math.floor(Math.random() * 4)]));
+        state.lastSpawn = time;
+    }
+
+    state.notes.forEach((n, i) => {
+        n.update();
+        n.draw();
+        if(n.y > canvas.height) {
+            state.notes.splice(i, 1);
+            if(state.combo > 5) state.judgments.push(new JudgmentText("MISS", n.x + laneWidth/2, "#ff0000"));
+            state.combo = 0;
+            updateUI();
+        }
+    });
+
+    state.judgments.forEach((j, i) => {
+        j.update();
+        ctx.globalAlpha = j.opacity;
+        ctx.fillStyle = j.color;
+        ctx.font = "bold 22px Orbitron";
+        ctx.textAlign = "center";
+        ctx.fillText(j.text, j.x, j.y);
+        ctx.globalAlpha = 1;
+        if(j.opacity <= 0) state.judgments.splice(i, 1);
+    });
+
+    requestAnimationFrame(mainLoop);
+}
+
+window.addEventListener('keydown', e => {
+    let key = e.key.toUpperCase();
+    if(lanes.includes(key) && !state.activeKeys[key]) {
+        state.activeKeys[key] = true;
+        triggerHit(key);
+    }
+});
+window.addEventListener('keyup', e => {
+    let key = e.key.toUpperCase();
+    if(lanes.includes(key)) state.activeKeys[key] = false;
 });
 
-// Mobile touch support (split canvas into 4 zones)
-canvas.addEventListener('touchstart',e=>{
-  const rect = canvas.getBoundingClientRect();
-  const touchX = e.touches[0].clientX - rect.left;
-  const laneIndex = Math.floor(touchX/laneWidth);
-  handleHit(lanes[laneIndex]);
-});
+canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    [...e.changedTouches].forEach(t => {
+        const x = (t.clientX - rect.left) * (canvas.width / rect.width);
+        const key = lanes[Math.floor(x / laneWidth)];
+        state.activeKeys[key] = true;
+        triggerHit(key);
+        setTimeout(() => state.activeKeys[key] = false, 100);
+    });
+}, {passive: false});
+
+requestAnimationFrame(mainLoop);
 </script>
-
 </body>
 </html>
