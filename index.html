@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>NAKUL ZONE | Premium Gaming Experience</title>
+    <link rel="manifest" href="manifest.json">
+     <meta name="theme-color" content="#00f7ff">
+    
     <link rel="icon" href="favicon.png" type="image/png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -1833,6 +1836,12 @@
             const gameLoadingSpinner = document.getElementById('gameLoadingSpinner');
             gameLoadingSpinner.style.display = 'none';
         });
+    </script>
+    
+    <script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("service-worker.js");
+}
     </script>
 </body>
 </html>
