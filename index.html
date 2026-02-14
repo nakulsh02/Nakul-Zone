@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>NAKUL ZONE · big centered header</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- ✅ CORRECT MANIFEST LINK - points to manifest.json -->
     <link rel="manifest" href="manifest.json">
     <style>
         /* ----- original variables & base (fully preserved) ----- */
@@ -591,16 +592,16 @@
             installAutoNotify.style.display = 'none';
         });
 
-        // loader + sw
+        // loader + ✅ CORRECT SERVICE WORKER REGISTRATION - points to service-worker.js
         window.addEventListener('load', () => {
             const loader = document.getElementById('loader');
             loader.style.opacity = '0';
             setTimeout(() => loader.style.display = 'none', 600);
 
             if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('sw.js')
-                .then(reg => console.log('✅ SW registered'))
-                .catch(err => console.log('❌ SW failed'));
+                navigator.serviceWorker.register('service-worker.js')  // ✅ Changed from 'sw.js' to 'service-worker.js'
+                .then(reg => console.log('✅ Service Worker registered with scope:', reg.scope))
+                .catch(err => console.log('❌ Service Worker registration failed:', err));
             }
         });
 
