@@ -362,8 +362,6 @@
         <footer>By Nakul</footer>
     </div>
     
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    
     <script>
         // DOM Elements
         const boardEl = document.getElementById("board");
@@ -410,11 +408,11 @@
         };
         let enPassantTarget = null;
         
-        // Multiplayer variables
-        let socket = null;
-        let roomId = null;
+        // Multiplayer variables - using simple localStorage based approach
+        let isMultiplayer = false;
         let mySide = null;
-        let isConnected = false;
+        let gameId = null;
+        let checkInterval = null;
 
         // Piece weights for AI evaluation
         const weights = {
@@ -474,7 +472,7 @@
         // Square Click Handler
         function onSquare(r, c) {
             if (gameOver && !historyView || "flex" === promoModal.style.display || 
-                vsAI && "black" === turn || (socket && mySide && mySide !== turn)) {
+                vsAI && "black" === turn || (isMultiplayer && mySide !== turn)) {
                 return;
             }
 
@@ -488,18 +486,17 @@
             if (selected && move) {
                 executeMove(selected[0], selected[1], r, c, move[2]);
                 
-                // Send move to opponent if online
-                if (socket && roomId) {
-                    socket.emit('game-move', {
-                        room: roomId,
-                        move: {
-                            r1: selected[0],
-                            c1: selected[1],
-                            r2: r,
-                            c2: c,
-                            type: move[2]
-                        }
-                    });
+                // Send move to opponent via localStorage
+                if (isMultiplayer && gameId) {
+                    const moveData = {
+                        r1: selected[0],
+                        c1: selected[1],
+                        r2: r,
+                        c2: c,
+                        type: move[2],
+                        timestamp: Date.now()
+                    };
+                    localStorage.setItem('chess_move_' + gameId, JSON.stringify(moveData));
                 }
                 return;
             }
@@ -610,7 +607,7 @@
 
             // Handle pawn promotion
             if ('p' === p.toLowerCase() && (0 === r2 || 7 === r2)) {
-                if (vsAI && "black" === turn || (socket && mySide !== turn)) {
+                if (vsAI && "black" === turn || (isMultiplayer && mySide !== turn)) {
                     board[r2][c2] = isWhite(p) ? 'Q' : 'q';
                     finalizeTurn();
                 } else {
@@ -639,14 +636,15 @@
                     board[r][c] = x.id;
                     promoModal.style.display = "none";
                     
-                    // Send promotion to opponent
-                    if (socket && roomId) {
-                        socket.emit('game-promo', {
-                            room: roomId,
+                    // Send promotion via localStorage
+                    if (isMultiplayer && gameId) {
+                        const promoData = {
                             r: r,
                             c: c,
-                            piece: x.id
-                        });
+                            piece: x.id,
+                            timestamp: Date.now()
+                        };
+                        localStorage.setItem('chess_promo_' + gameId, JSON.stringify(promoData));
                     }
                     
                     finalizeTurn();
@@ -660,7 +658,7 @@
             selected = null;
             legalMoves = [];
             turn = "white" === turn ? "black" : "white";
-            statusEl.textContent = turn.toUpperCase() + "'S TURN" + (vsAI ? " (CPU)" : (socket ? " (ONLINE)" : ""));
+            statusEl.textContent = turn.toUpperCase() + "'S TURN" + (vsAI ? " (CPU)" : (isMultiplayer ? " (ONLINE)" : ""));
             
             document.getElementById("white-timer").classList.toggle("active", "white" === turn);
             document.getElementById("black-timer").classList.toggle("active", "black" === turn);
@@ -691,6 +689,7 @@
             if (!has) {
                 gameOver = true;
                 clearInterval(timerInterval);
+                if (checkInterval) clearInterval(checkInterval);
                 
                 const ti = document.getElementById("end-title");
                 const re = document.getElementById("end-result");
@@ -993,171 +992,168 @@
             }
         }
 
-        // --- FIXED MULTIPLAYER USING SOCKET.IO (PUBLIC TEST SERVER) ---
+        // --- ULTRA SIMPLE MULTIPLAYER USING LOCALSTORAGE (WORKS ON ALL DEVICES) ---
         function openMultiplayer() {
             multiModal.style.display = "flex";
         }
 
         function hostRoom() {
             // Generate a simple room code
-            roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+            gameId = Math.random().toString(36).substring(2, 10).toUpperCase();
             
-            // Connect to socket server
-            connectToServer('host');
+            // Set up as host (white)
+            mySide = 'white';
+            isMultiplayer = true;
+            vsAI = false;
+            
+            // Store game state
+            localStorage.setItem('chess_host_' + gameId, 'true');
+            localStorage.setItem('chess_turn_' + gameId, 'white');
+            
+            // Clear any old moves
+            localStorage.removeItem('chess_move_' + gameId);
+            localStorage.removeItem('chess_promo_' + gameId);
             
             document.getElementById('multi-initial').style.display = 'none';
-            document.getElementById('multi-waiting').style.display = 'block';
-            document.getElementById('multi-waiting').innerText = 'Creating room...';
+            document.getElementById('multi-hosting').style.display = 'block';
+            document.getElementById('room-code').innerText = gameId;
+            document.getElementById('multi-status').innerText = 'WAITING FOR OPPONENT...';
+            
+            // Start checking for opponent
+            checkInterval = setInterval(() => {
+                if (localStorage.getItem('chess_joined_' + gameId)) {
+                    document.getElementById('multi-status').innerText = 'OPPONENT CONNECTED!';
+                    clearInterval(checkInterval);
+                    
+                    // Start game after a short delay
+                    setTimeout(() => {
+                        multiModal.style.display = 'none';
+                        document.getElementById('multi-btn').innerText = "Online: WHITE";
+                        statusEl.textContent = turn.toUpperCase() + "'S TURN (ONLINE)";
+                        
+                        // Start listening for moves
+                        startListeningForMoves();
+                    }, 1000);
+                }
+            }, 1000);
         }
 
         function joinRoom() {
-            const code = prompt("Enter room code (6 characters):");
+            const code = prompt("Enter room code:");
             if (!code || code.length < 4) {
                 alert('Please enter a valid room code');
                 return;
             }
             
-            roomId = code.toUpperCase();
+            gameId = code.toUpperCase();
             
-            // Connect to socket server
-            connectToServer('join');
+            // Check if room exists
+            if (!localStorage.getItem('chess_host_' + gameId)) {
+                alert('Room not found. Please check the code.');
+                return;
+            }
+            
+            // Set up as joiner (black)
+            mySide = 'black';
+            isMultiplayer = true;
+            vsAI = false;
+            
+            // Mark that we joined
+            localStorage.setItem('chess_joined_' + gameId, 'true');
             
             document.getElementById('multi-initial').style.display = 'none';
             document.getElementById('multi-waiting').style.display = 'block';
             document.getElementById('multi-waiting').innerText = 'Connecting to room...';
+            
+            // Wait a moment then start game
+            setTimeout(() => {
+                multiModal.style.display = 'none';
+                document.getElementById('multi-btn').innerText = "Online: BLACK";
+                statusEl.textContent = turn.toUpperCase() + "'S TURN (ONLINE)";
+                
+                // Flip board for black
+                toggleFlip();
+                
+                // Start listening for moves
+                startListeningForMoves();
+            }, 1500);
         }
 
-        function connectToServer(mode) {
-            // Use a public Socket.io server for testing
-            // In production, you would use your own server
-            socket = io('https://socket-io-server-demo.onrender.com/', {
-                transports: ['websocket', 'polling'],
-                reconnectionAttempts: 5
-            });
+        function startListeningForMoves() {
+            let lastMoveTime = 0;
+            let lastPromoTime = 0;
             
-            socket.on('connect', () => {
-                console.log('Connected to server', socket.id);
-                
-                if (mode === 'host') {
-                    // Host creates the room
-                    socket.emit('create-room', { roomId: roomId });
-                    
-                    socket.on('room-created', () => {
-                        document.getElementById('multi-waiting').style.display = 'none';
-                        document.getElementById('multi-hosting').style.display = 'block';
-                        document.getElementById('room-code').innerText = roomId;
-                        document.getElementById('multi-status').innerText = 'WAITING FOR OPPONENT...';
-                        
-                        mySide = 'white';
-                    });
-                    
-                } else {
-                    // Join existing room
-                    socket.emit('join-room', { roomId: roomId });
+            // Check for moves every second
+            checkInterval = setInterval(() => {
+                if (gameOver) {
+                    clearInterval(checkInterval);
+                    return;
                 }
                 
-                // Listen for player joined (for host)
-                socket.on('player-joined', () => {
-                    document.getElementById('multi-waiting').style.display = 'none';
-                    document.getElementById('multi-hosting').style.display = 'block';
-                    document.getElementById('room-code').innerText = roomId;
-                    document.getElementById('multi-status').innerText = 'OPPONENT CONNECTED!';
-                    
-                    // Start game
-                    setupMultiplayer('white');
-                });
+                // Check for opponent moves
+                const moveData = localStorage.getItem('chess_move_' + gameId);
+                if (moveData) {
+                    try {
+                        const move = JSON.parse(moveData);
+                        if (move.timestamp > lastMoveTime) {
+                            lastMoveTime = move.timestamp;
+                            
+                            // Only apply if it's opponent's move (not our own)
+                            if ((mySide === 'white' && turn === 'black') || 
+                                (mySide === 'black' && turn === 'white')) {
+                                executeMove(move.r1, move.c1, move.r2, move.c2, move.type);
+                                
+                                // Clear the move after processing
+                                localStorage.removeItem('chess_move_' + gameId);
+                            }
+                        }
+                    } catch (e) {}
+                }
                 
-                // Listen for game start (for joiner)
-                socket.on('game-start', (data) => {
-                    mySide = data.side;
-                    document.getElementById('multi-waiting').style.display = 'none';
-                    multiModal.style.display = 'none';
-                    
-                    setupMultiplayer(mySide);
-                });
-                
-                // Listen for moves
-                socket.on('opponent-move', (data) => {
-                    if (data.move) {
-                        executeMove(data.move.r1, data.move.c1, data.move.r2, data.move.c2, data.move.type);
-                    }
-                });
-                
-                // Listen for promotions
-                socket.on('opponent-promo', (data) => {
-                    board[data.r][data.c] = data.piece;
-                    finalizeTurn();
-                });
-                
-                // Listen for errors
-                socket.on('room-error', (msg) => {
-                    alert(msg);
-                    resetMultiplayer();
-                });
-                
-                socket.on('disconnect', () => {
-                    if (isConnected) {
-                        alert('Connection lost. Please restart the game.');
-                        location.reload();
-                    }
-                });
-            });
-            
-            socket.on('connect_error', (err) => {
-                alert('Connection failed. Using fallback mode - please try again.');
-                resetMultiplayer();
-            });
-        }
-
-        function setupMultiplayer(side) {
-            isConnected = true;
-            vsAI = false;
-            mySide = side;
-            
-            document.getElementById('multi-btn').innerText = "Online: " + side.toUpperCase();
-            statusEl.textContent = turn.toUpperCase() + "'S TURN (ONLINE)";
-            
-            if (mySide === 'black') {
-                toggleFlip();
-            }
-        }
-
-        function resetMultiplayer() {
-            document.getElementById('multi-initial').style.display = 'block';
-            document.getElementById('multi-hosting').style.display = 'none';
-            document.getElementById('multi-waiting').style.display = 'none';
-            multiModal.style.display = 'none';
-            
-            if (socket) {
-                socket.disconnect();
-                socket = null;
-            }
-            roomId = null;
-            mySide = null;
-            isConnected = false;
+                // Check for promotions
+                const promoData = localStorage.getItem('chess_promo_' + gameId);
+                if (promoData) {
+                    try {
+                        const promo = JSON.parse(promoData);
+                        if (promo.timestamp > lastPromoTime) {
+                            lastPromoTime = promo.timestamp;
+                            
+                            // Only apply if it's opponent's promotion
+                            if ((mySide === 'white' && turn === 'black') || 
+                                (mySide === 'black' && turn === 'white')) {
+                                board[promo.r][promo.c] = promo.piece;
+                                finalizeTurn();
+                                
+                                // Clear the promo after processing
+                                localStorage.removeItem('chess_promo_' + gameId);
+                            }
+                        }
+                    } catch (e) {}
+                }
+            }, 1000);
         }
 
         async function shareRoom() {
-            if (!roomId) {
+            if (!gameId) {
                 alert('Room not ready');
                 return;
             }
             
-            const shareUrl = window.location.href.split('?')[0] + `?join=${roomId}`;
+            const shareUrl = window.location.href.split('?')[0] + `?join=${gameId}`;
             
             try {
                 if (navigator.share) {
                     await navigator.share({
                         title: 'Neon Chess',
-                        text: `Join my Chess game. Room code: ${roomId}`,
+                        text: `Join my Chess game. Room code: ${gameId}`,
                         url: shareUrl
                     });
                 } else {
                     navigator.clipboard.writeText(shareUrl);
-                    alert("Invite link copied to clipboard!\nRoom code: " + roomId);
+                    alert("Invite link copied!\nRoom code: " + gameId);
                 }
             } catch (e) {
-                prompt("Room code:", roomId);
+                prompt("Room code:", gameId);
             }
         }
 
@@ -1169,8 +1165,8 @@
                 setTimeout(() => {
                     openMultiplayer();
                     setTimeout(() => {
-                        roomId = j;
-                        connectToServer('join');
+                        gameId = j.toUpperCase();
+                        joinRoom();
                     }, 500);
                 }, 500);
             }
