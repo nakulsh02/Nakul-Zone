@@ -1,1084 +1,679 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <!-- 
-    =========================================================================
-    CHESS GAME - METICULOUSLY DOCUMENTED EXPANDED VERSION
-    =========================================================================
-    This is a complete chess game implementation with:
-    - Full chess rules including castling, en passant, pawn promotion
-    - Neon-themed visual design
-    - Move history with replay capability
-    - Built-in AI opponent with three difficulty levels
-    - Chess clocks/timers for both players
-    - Check and checkmate detection
-    - Legal move highlighting
-    =========================================================================
-    -->
-    
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-select=none">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <title>Neon Chess Pro ♟️</title>
-    
-    <!-- 
-    =========================================================================
-    STYLESHEET - Complete visual design system
-    =========================================================================
-    -->
     <style>
-        /* 
-        =====================================================================
-        CSS CUSTOM PROPERTIES (VARIABLES)
-        =====================================================================
-        Centralized color scheme and design tokens for consistent theming
-        */
         :root {
-            --bg: #070b18;              /* Primary background - deep space blue */
-            --dark: #0c1430;             /* Dark squares - midnight blue */
-            --light: #16245a;             /* Light squares - royal blue */
-            --neon: #00f7ff;              /* Neon accent - cyan highlight */
-            --last-move: rgba(0,247,255,0.2);  /* Last move highlight - transparent cyan */
-            --his: rgba(255,0,255,0.4);   /* History view highlight - magenta */
-            --danger: #ff4d6d;             /* Check warning - vibrant red */
-            --glass: rgba(12,20,48,0.98);   /* Glass modal effect - semi-transparent dark */
+            --bg: #070b18;
+            --dark: #0c1430;
+            --light: #16245a;
+            --neon: #00f7ff;
+            --last-move: rgba(0, 247, 255, 0.2);
+            --his: rgba(255, 0, 255, 0.4);
+            --danger: #ff4d6d;
+            --glass: rgba(12, 20, 48, 0.98);
+            --multi: #f0f;
         }
-
-        /* 
-        =====================================================================
-        GLOBAL RESETS AND BASE STYLES
-        =====================================================================
-        Ensure consistent box sizing and font rendering across all browsers
-        */
+        
         * {
-            box-sizing: border-box;        /* Include padding in element dimensions */
-            font-family: 'Segoe UI', sans-serif;  /* Modern, clean font stack */
+            box-sizing: border-box;
+            font-family: 'Segoe UI', sans-serif;
         }
-
-        /* 
-        =====================================================================
-        BODY STYLING
-        =====================================================================
-        Create centered, gradient background with proper overflow handling
-        */
+        
         body {
-            margin: 0;                     /* Remove default body margin */
-            min-height: 100vh;              /* Ensure full viewport height coverage */
-            display: flex;                  /* Enable flexbox layout */
-            justify-content: center;        /* Center content horizontally */
-            align-items: center;             /* Center content vertically */
-            background: radial-gradient(circle at top, #1a2550, var(--bg));  /* Gradient from light blue to dark */
-            color: #fff;                    /* Default text color - white */
-            overflow: hidden;                /* Prevent unwanted scrolling */
-            flex-direction: column;          /* Stack children vertically */
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle at top, #1a2550, var(--bg));
+            color: #fff;
+            overflow: hidden;
+            flex-direction: column;
         }
-
-        /* 
-        =====================================================================
-        MAIN GAME CONTAINER
-        =====================================================================
-        Glass-morphism card containing all game elements
-        */
+        
         .game {
-            background: #101935;             /* Dark blue base */
-            padding: 10px;                   /* Internal spacing */
-            border-radius: 15px;              /* Rounded corners */
-            box-shadow: 0 0 50px rgba(0,247,255,.15);  /* Neon glow effect */
-            position: relative;                /* For absolute positioning context */
-            display: flex;                     /* Flex container */
-            flex-direction: column;             /* Stack children vertically */
-            align-items: center;                /* Center children horizontally */
-            width: 95vw;                       /* Responsive width - 95% viewport */
-            max-width: 420px;                   /* Maximum width for larger screens */
-            border: 1px solid rgba(0,247,255,.1);  /* Subtle neon border */
+            background: #101935;
+            padding: 10px;
+            border-radius: 15px;
+            box-shadow: 0 0 50px rgba(0, 247, 255, .15);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 95vw;
+            max-width: 420px;
+            border: 1px solid rgba(0, 247, 255, .1);
         }
-
-        /* 
-        =====================================================================
-        CLOCK CONTAINER
-        =====================================================================
-        Holds timers and captured pieces displays
-        */
+        
         .clock-container {
-            display: flex;                     /* Flex layout */
-            justify-content: space-between;     /* Space elements evenly */
-            width: 90vw;                        /* Responsive width */
-            max-width: 400px;                    /* Maximum width constraint */
-            margin-bottom: 8px;                  /* Bottom spacing */
-            align-items: center;                  /* Vertical center alignment */
+            display: flex;
+            justify-content: space-between;
+            width: 90vw;
+            max-width: 400px;
+            margin-bottom: 8px;
+            align-items: center;
         }
-
-        /* 
-        =====================================================================
-        CAPTURED PIECES BOX
-        =====================================================================
-        Container for displaying captured piece icons
-        */
+        
         .captured-box {
-            font-size: 1.1rem;                   /* Icon size */
-            display: flex;                         /* Flex layout */
-            gap: 2px;                              /* Spacing between icons */
-            height: 25px;                          /* Fixed height */
-            min-width: 100px;                       /* Minimum width for content */
+            font-size: 1.1rem;
+            display: flex;
+            gap: 2px;
+            height: 25px;
+            min-width: 100px;
         }
-
-        /* 
-        =====================================================================
-        TIMER DISPLAY
-        =====================================================================
-        Chess clock styling for each player
-        */
+        
         .timer {
-            background: var(--dark);                 /* Dark background */
-            border: 1px solid var(--neon);           /* Neon border */
-            padding: 4px 10px;                         /* Internal spacing */
-            border-radius: 8px;                         /* Rounded corners */
-            font-family: monospace;                      /* Monospace for consistent timing display */
-            font-size: 1rem;                              /* Readable font size */
-            color: var(--neon);                            /* Neon text color */
-            min-width: 75px;                               /* Minimum width */
-            text-align: center;                             /* Center align numbers */
+            background: var(--dark);
+            border: 1px solid var(--neon);
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 1rem;
+            color: var(--neon);
+            min-width: 75px;
+            text-align: center;
         }
-
-        /* 
-        =====================================================================
-        ACTIVE TIMER STATE
-        =====================================================================
-        Highlight the timer of the player whose turn it is
-        */
+        
         .timer.active {
-            background: var(--light);                 /* Lighter background when active */
-            box-shadow: 0 0 15px var(--neon);          /* Stronger glow effect */
-            border-color: #fff;                         /* White border when active */
+            background: var(--light);
+            box-shadow: 0 0 15px var(--neon);
+            border-color: #fff;
         }
-
-        /* 
-        =====================================================================
-        BOARD WRAPPER
-        =====================================================================
-        Maintains square aspect ratio for the chessboard
-        */
+        
         .board-wrapper {
-            position: relative;                      /* For modal positioning context */
-            width: 90vw;                             /* Responsive width */
-            height: 90vw;                             /* Height equals width for perfect square */
-            max-width: 400px;                          /* Maximum dimensions */
+            position: relative;
+            width: 90vw;
+            height: 90vw;
+            max-width: 400px;
             max-height: 400px;
         }
-
-        /* 
-        =====================================================================
-        CHESSBOARD GRID
-        =====================================================================
-        8x8 grid layout for chess squares
-        */
+        
         .board {
-            width: 100%;                               /* Fill wrapper width */
-            height: 100%;                               /* Fill wrapper height */
-            display: grid;                               /* Grid layout */
-            grid-template-columns: repeat(8, 1fr);       /* 8 equal columns */
-            grid-template-rows: repeat(8, 1fr);          /* 8 equal rows */
-            border-radius: 8px;                           /* Rounded corners */
-            overflow: hidden;                              /* Hide overflow for rounded corners */
-            border: 3px solid var(--neon);                /* Neon border around board */
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 3px solid var(--neon);
         }
-
-        /* 
-        =====================================================================
-        INDIVIDUAL SQUARE STYLING
-        =====================================================================
-        Base styling for all chessboard squares
-        */
+        
         .square {
-            display: flex;                                 /* Flex for centering pieces */
-            align-items: center;                           /* Vertical center */
-            justify-content: center;                       /* Horizontal center */
-            font-size: 7.5vw;                              /* Responsive piece size */
-            cursor: pointer;                                /* Clickable squares */
-            position: relative;                              /* For pseudo-elements (move dots) */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 7.5vw;
+            cursor: pointer;
+            position: relative;
         }
-
-        /* 
-        =====================================================================
-        RESPONSIVE SQUARE SIZING
-        =====================================================================
-        Larger screens get fixed piece size instead of viewport-relative
-        */
+        
         @media (min-width: 450px) {
             .square {
-                font-size: 36px;                           /* Fixed size on larger screens */
+                font-size: 36px;
             }
         }
-
-        /* 
-        =====================================================================
-        BLACK PIECES ROTATION
-        =====================================================================
-        Rotate black pieces 180 degrees for proper orientation from black's perspective
-        */
+        
         .square[data-side=black] {
-            transform: rotate(180deg);                      /* Flip black pieces upside down */
+            transform: rotate(180deg);
         }
-
-        /* 
-        =====================================================================
-        ROTATION TOGGLE
-        =====================================================================
-        When rotation is disabled, pieces appear normally for both sides
-        */
+        
         .no-flip .square[data-side=black] {
-            transform: rotate(0deg);                        /* No rotation when toggle is off */
+            transform: rotate(0deg);
         }
-
-        /* 
-        =====================================================================
-        SQUARE COLOR CLASSES
-        =====================================================================
-        Alternating dark and light squares
-        */
+        
         .dark {
-            background: var(--dark);                         /* Dark square color */
+            background: var(--dark);
         }
+        
         .light {
-            background: var(--light);                        /* Light square color */
+            background: var(--light);
         }
-
-        /* 
-        =====================================================================
-        SELECTED SQUARE HIGHLIGHT
-        =====================================================================
-        Highlight the currently selected piece
-        */
+        
         .selected {
-            background: rgba(0,247,255,.3)!important;       /* Cyan overlay for selected square */
+            background: rgba(0, 247, 255, .3) !important;
         }
-
-        /* 
-        =====================================================================
-        LAST MOVE HIGHLIGHT
-        =====================================================================
-        Highlight the squares involved in the most recent move
-        */
+        
         .last-move {
-            background: var(--last-move)!important;          /* Transparent cyan overlay */
-            box-shadow: inset 0 0 8px var(--neon);           /* Inner glow effect */
+            background: var(--last-move) !important;
+            box-shadow: inset 0 0 8px var(--neon);
         }
-
-        /* 
-        =====================================================================
-        HISTORY VIEW HIGHLIGHT
-        =====================================================================
-        Highlight squares when viewing a move from history
-        */
+        
         .history-view {
-            background: var(--his)!important;                 /* Magenta overlay */
-            border: 2px solid #f0f;                            /* Pink border */
-            box-shadow: inset 0 0 10px #f0f;                   /* Pink inner glow */
+            background: var(--his) !important;
+            border: 2px solid #f0f;
+            box-shadow: inset 0 0 10px #f0f;
         }
-
-        /* 
-        =====================================================================
-        MOVE INDICATOR DOTS
-        =====================================================================
-        Small dots showing legal move destinations
-        */
+        
         .move-dot::after {
-            content: "";                                        /* Empty pseudo-element */
-            width: 25%;                                         /* Dot size relative to square */
+            content: "";
+            width: 25%;
             height: 25%;
-            background: var(--neon);                             /* Cyan color */
-            border-radius: 50%;                                  /* Perfect circle */
-            position: absolute;                                   /* Position over square */
-            opacity: .6;                                          /* Semi-transparent */
+            background: var(--neon);
+            border-radius: 50%;
+            position: absolute;
+            opacity: .6;
         }
-
-        /* 
-        =====================================================================
-        CHECK INDICATOR
-        =====================================================================
-        Red radial gradient when king is in check
-        */
+        
         .check {
-            background: radial-gradient(var(--danger), transparent)!important;  /* Red fade effect */
+            background: radial-gradient(var(--danger), transparent) !important;
         }
-
-        /* 
-        =====================================================================
-        MOVE HISTORY CONTAINER
-        =====================================================================
-        Horizontal scrollable list of moves
-        */
+        
         .history-container {
-            width: 90vw;                                         /* Responsive width */
-            max-width: 400px;                                     /* Maximum width */
-            height: 45px;                                         /* Fixed height */
-            margin-top: 10px;                                      /* Top spacing */
-            display: flex;                                         /* Flex layout */
-            gap: 8px;                                              /* Space between items */
-            overflow-x: auto;                                      /* Horizontal scrolling */
-            padding: 8px;                                          /* Internal spacing */
-            background: rgba(0,0,0,.4);                            /* Semi-transparent background */
-            border-radius: 10px;                                   /* Rounded corners */
-            scroll-behavior: smooth;                               /* Smooth scrolling */
-            -ms-overflow-style: none;                               /* Hide scrollbar IE/Edge */
-            scrollbar-width: none;                                  /* Hide scrollbar Firefox */
+            width: 90vw;
+            max-width: 400px;
+            height: 45px;
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 8px;
+            background: rgba(0, 0, 0, .4);
+            border-radius: 10px;
+            scroll-behavior: smooth;
+            -ms-overflow-style: none;
+            scrollbar-width: none;
         }
-
-        /* Hide scrollbar in Chrome/Safari */
+        
         .history-container::-webkit-scrollbar {
             display: none;
         }
-
-        /* 
-        =====================================================================
-        INDIVIDUAL HISTORY ITEM
-        =====================================================================
-        Each move displayed as a clickable chip
-        */
+        
         .history-item {
-            background: var(--light);                               /* Light square background */
-            border: 1px solid var(--neon);                          /* Neon border */
-            color: #fff;                                             /* White text */
-            padding: 2px 10px;                                       /* Internal spacing */
-            border-radius: 6px;                                      /* Rounded corners */
-            font-size: .8rem;                                        /* Small font */
-            white-space: nowrap;                                      /* Prevent text wrapping */
-            cursor: pointer;                                          /* Clickable */
+            background: var(--light);
+            border: 1px solid var(--neon);
+            color: #fff;
+            padding: 2px 10px;
+            border-radius: 6px;
+            font-size: .8rem;
+            white-space: nowrap;
+            cursor: pointer;
         }
-
-        /* 
-        =====================================================================
-        GAME STATUS DISPLAY
-        =====================================================================
-        Shows current turn or game result
-        */
+        
         .status {
-            margin-top: 8px;                                         /* Top spacing */
-            text-align: center;                                       /* Centered text */
-            font-size: .9rem;                                         /* Readable size */
-            color: var(--neon);                                       /* Neon color */
-            letter-spacing: 1px;                                      /* Slight letter spacing */
-            font-weight: 700;                                         /* Bold text */
+            margin-top: 8px;
+            text-align: center;
+            font-size: .9rem;
+            color: var(--neon);
+            font-weight: 700;
         }
-
-        /* 
-        =====================================================================
-        BUTTON STYLING
-        =====================================================================
-        Base styles for all control buttons
-        */
+        
         .btn {
-            background: 0 0;                                          /* Transparent background */
-            border: 1px solid var(--neon);                            /* Neon border */
-            color: var(--neon);                                       /* Neon text */
-            padding: 6px 14px;                                        /* Button padding */
-            border-radius: 8px;                                       /* Rounded corners */
-            cursor: pointer;                                           /* Clickable */
-            font-size: .8rem;                                         /* Font size */
-            margin-top: 10px;                                          /* Top spacing */
-            transition: .2s;                                           /* Smooth hover transition */
+            background: 0 0;
+            border: 1px solid var(--neon);
+            color: var(--neon);
+            padding: 6px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: .8rem;
+            margin-top: 10px;
+            transition: .2s;
         }
-
-        /* Button hover effect */
+        
         .btn:hover {
-            background: var(--neon);                                   /* Fill with neon on hover */
-            color: var(--bg);                                          /* Text becomes dark */
-            box-shadow: 0 0 15px var(--neon);                          /* Glow effect */
+            background: var(--neon);
+            color: var(--bg);
+            box-shadow: 0 0 15px var(--neon);
         }
-
-        /* 
-        =====================================================================
-        MODAL OVERLAY
-        =====================================================================
-        Semi-transparent overlay for modals
-        */
+        
         .modal-overlay {
-            display: none;                                              /* Hidden by default */
-            position: absolute;                                         /* Position relative to board-wrapper */
-            top: 0;                                                     /* Cover entire board */
+            display: none;
+            position: absolute;
+            top: 0;
             left: 0;
-            width: 100%;                                                /* Full width */
-            height: 100%;                                               /* Full height */
-            background: rgba(0,0,0,.6);                                 /* Dark overlay */
-            backdrop-filter: blur(4px);                                 /* Background blur effect */
-            z-index: 1000;                                              /* High z-index to appear above board */
-            align-items: center;                                        /* Center modal vertically */
-            justify-content: center;                                    /* Center modal horizontally */
-            border-radius: 8px;                                         /* Rounded corners */
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, .6);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
         }
-
-        /* 
-        =====================================================================
-        MODAL CONTENT
-        =====================================================================
-        Glass-morphism modal dialog
-        */
+        
         .modal-content {
-            background: var(--glass);                                   /* Semi-transparent dark */
-            border: 2px solid var(--neon);                              /* Neon border */
-            padding: 25px;                                              /* Internal spacing */
-            border-radius: 20px;                                        /* Rounded corners */
-            width: 85%;                                                 /* Responsive width */
-            max-width: 300px;                                           /* Maximum width */
-            text-align: center;                                         /* Centered text */
-            box-shadow: 0 0 40px rgba(0,247,255,.4);                   /* Strong glow effect */
-            animation: pop .3s ease-out;                                /* Pop animation on appear */
+            background: var(--glass);
+            border: 2px solid var(--neon);
+            padding: 25px;
+            border-radius: 20px;
+            width: 85%;
+            max-width: 300px;
+            text-align: center;
+            box-shadow: 0 0 40px rgba(0, 247, 255, .4);
+            animation: pop .3s ease-out;
         }
-
-        /* 
-        =====================================================================
-        MODAL POP ANIMATION
-        =====================================================================
-        Scale animation when modal appears
-        */
+        
         @keyframes pop {
             from {
-                transform: scale(.8);                                   /* Start smaller */
-                opacity: 0;                                              /* Start invisible */
+                transform: scale(.8);
+                opacity: 0;
             }
             to {
-                transform: scale(1);                                     /* End normal size */
-                opacity: 1;                                              /* End fully visible */
+                transform: scale(1);
+                opacity: 1;
             }
         }
-
-        /* 
-        =====================================================================
-        MODAL OPTION BUTTONS
-        =====================================================================
-        Full-width buttons inside modals
-        */
+        
         .option-btn {
-            width: 100%;                                                /* Full width */
-            padding: 12px;                                              /* Internal padding */
-            border: 1px solid rgba(0,247,255,.3);                       /* Subtle neon border */
-            background: rgba(22,36,90,.6);                              /* Semi-transparent blue */
-            color: #fff;                                                /* White text */
-            border-radius: 10px;                                        /* Rounded corners */
-            cursor: pointer;                                             /* Clickable */
-            font-weight: 700;                                           /* Bold text */
-            transition: .3s;                                            /* Smooth transition */
-            display: flex;                                              /* Flex layout */
-            align-items: center;                                        /* Center vertically */
-            justify-content: center;                                    /* Center horizontally */
-            gap: 10px;                                                  /* Space between icon and text */
-            margin-bottom: 8px;                                         /* Bottom spacing */
+            width: 100%;
+            padding: 12px;
+            border: 1px solid rgba(0, 247, 255, .3);
+            background: rgba(22, 36, 90, .6);
+            color: #fff;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 700;
+            transition: .3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 8px;
         }
-
-        /* Option button hover effect */
+        
         .option-btn:hover {
-            background: rgba(0,247,255,.2);                             /* Lighter on hover */
-            border-color: var(--neon);                                  /* Solid neon border */
-            box-shadow: 0 0 10px var(--neon);                           /* Glow effect */
+            background: rgba(0, 247, 255, .2);
+            border-color: var(--neon);
+            box-shadow: 0 0 10px var(--neon);
         }
-
-        /* 
-        =====================================================================
-        FOOTER CREDIT
-        =====================================================================
-        Attribution at bottom of page
-        */
+        
         footer {
-            margin-top: 15px;                                           /* Top spacing */
-            font-size: .75rem;                                          /* Small text */
-            color: var(--neon);                                         /* Neon color */
-            opacity: .6;                                                /* Subtle appearance */
-            letter-spacing: 2px;                                        /* Spaced letters */
-            text-transform: uppercase;                                   /* All caps */
+            margin-top: 15px;
+            font-size: .75rem;
+            color: var(--neon);
+            opacity: .6;
+            letter-spacing: 2px;
+            text-transform: uppercase;
         }
     </style>
 </head>
 <body>
-    <!-- 
-    =========================================================================
-    MAIN GAME CONTAINER
-    =========================================================================
-    -->
     <div class="game">
-        <!-- 
-        =====================================================================
-        TOP CLOCK CONTAINER
-        =====================================================================
-        Black's timer and captured pieces display
-        -->
         <div class="clock-container">
-            <!-- Captured pieces for black (white pieces captured by black) -->
             <div id="black-captured" class="captured-box"></div>
-            <!-- Black player's timer -->
             <div id="black-timer" class="timer">00:00</div>
         </div>
-
-        <!-- 
-        =====================================================================
-        CHESSBOARD WRAPPER WITH MODALS
-        =====================================================================
-        Contains the board and all modal dialogs
-        -->
+        
         <div class="board-wrapper">
-            <!-- The chessboard itself - will be populated by JavaScript -->
             <div class="board" id="board"></div>
             
-            <!-- 
-            =================================================================
-            PAWN PROMOTION MODAL
-            =================================================================
-            Appears when a pawn reaches the opposite rank
-            -->
             <div id="promo-modal" class="modal-overlay">
                 <div class="modal-content">
-                    <!-- Modal title -->
-                    <div style="color:var(--neon);font-size:1.1rem;margin-bottom:15px">PAWN PROMOTION</div>
-                    <!-- Container for promotion piece options -->
+                    <div style="color:var(--neon); font-size:1.1rem; margin-bottom:15px">PAWN PROMOTION</div>
                     <div id="promo-options"></div>
                 </div>
             </div>
-
-            <!-- 
-            =================================================================
-            GAME END MODAL
-            =================================================================
-            Appears for checkmate or stalemate
-            -->
+            
             <div id="end-modal" class="modal-overlay">
                 <div class="modal-content">
-                    <!-- Result title (CHECKMATE or STALEMATE) -->
-                    <div id="end-title" style="color:var(--neon);font-size:1.6rem;font-weight:700;margin-bottom:5px">CHECKMATE</div>
-                    <!-- Winner message -->
-                    <div id="end-result" style="font-size:1rem;margin-bottom:20px;color:rgba(255,255,255,.8)">White Wins</div>
-                    <!-- Restart game button -->
+                    <div id="end-title" style="color:var(--neon); font-size:1.6rem; font-weight:700; margin-bottom:5px">CHECKMATE</div>
+                    <div id="end-result" style="font-size:1rem; margin-bottom:20px; color:rgba(255,255,255,.8)">White Wins</div>
                     <button class="option-btn" onclick="location.reload()">RESTART MATCH</button>
-                    <!-- Close modal and analyze button -->
-                    <button class="option-btn" style="border-color:#f0f;color:#f0f" onclick="closeEndModal()">ANALYSE BOARD</button>
+                    <button class="option-btn" style="border-color:#f0f; color:#f0f" onclick="closeEndModal()">ANALYSE BOARD</button>
                 </div>
             </div>
         </div>
-
-        <!-- 
-        =====================================================================
-        BOTTOM CLOCK CONTAINER
-        =====================================================================
-        White's timer and captured pieces display
-        -->
+        
         <div class="clock-container" style="margin-top:10px">
-            <!-- Captured pieces for white (black pieces captured by white) -->
             <div id="white-captured" class="captured-box"></div>
-            <!-- White player's timer -->
             <div id="white-timer" class="timer active">00:00</div>
         </div>
-
-        <!-- 
-        =====================================================================
-        MOVE HISTORY CONTAINER
-        =====================================================================
-        Scrollable list of moves made in the game
-        -->
+        
         <div class="history-container" id="history"></div>
-
-        <!-- 
-        =====================================================================
-        GAME STATUS DISPLAY
-        =====================================================================
-        Shows current turn or game result
-        -->
+        
         <div id="status" class="status">WHITE'S TURN</div>
-
-        <!-- 
-        =====================================================================
-        CONTROL BUTTONS
-        =====================================================================
-        Game controls for rotation and AI
-        -->
-        <div style="display:flex;gap:10px">
-            <!-- Toggle board rotation button -->
+        
+        <div style="display:flex; gap:10px; justify-content:center; width:100%">
             <button class="btn" onclick="toggleFlip()">Rotate 🔄</button>
-            <!-- Open AI selection modal button -->
-            <button class="btn" onclick="openAISelection()" id="ai-btn">Play Bot AI 🤖</button>
+            <button class="btn" onclick="openAISelection()" id="ai-btn">Bot AI 🤖</button>
+            <button class="btn" style="border-color:var(--multi); color:var(--multi)" onclick="openMultiplayer()" id="multi-btn">Online 🌐</button>
         </div>
-
-        <!-- 
-        =====================================================================
-        AI DIFFICULTY SELECTION MODAL
-        =====================================================================
-        Full-screen modal for choosing AI difficulty
-        -->
-        <div id="ai-modal" class="modal-overlay" style="position:fixed;height:100vh;width:100vw;background:rgba(0,0,0,.8)">
-            <div class="modal-content">
-                <!-- Modal title -->
-                <div style="color:var(--neon);font-size:1.2rem;margin-bottom:15px;letter-spacing:2px">CPU CHALLENGE</div>
-                <!-- Easy difficulty button -->
-                <button class="option-btn" onclick="startAI('easy')">EASY</button>
-                <!-- Hard difficulty button -->
-                <button class="option-btn" onclick="startAI('hard')">HARD</button>
-                <!-- Insane difficulty button -->
-                <button class="option-btn" style="color:var(--danger);border-color:var(--danger)" onclick="startAI('insane')">INSANE</button>
-                <!-- Close modal link -->
-                <div style="font-size:.75rem;color:rgba(255,255,255,.5);cursor:pointer;margin-top:10px" onclick="aiModal.style.display='none'">[ CLOSE ]</div>
+        
+        <div id="multi-modal" class="modal-overlay" style="position:fixed; height:100vh; width:100vw; background:rgba(0,0,0,.8)">
+            <div class="modal-content" style="border-color:var(--multi)">
+                <div style="color:var(--multi); font-size:1.2rem; margin-bottom:15px; letter-spacing:2px">MULTIPLAYER</div>
+                <div id="multi-initial">
+                    <button class="option-btn" onclick="hostRoom()">HOST GAME</button>
+                    <button class="option-btn" onclick="joinRoom()">JOIN GAME</button>
+                </div>
+                <div id="multi-hosting" style="display:none">
+                    <div id="multi-status" style="font-size:0.8rem; margin-bottom:10px; color:var(--neon)">WAITING FOR PLAYER...</div>
+                    <div id="room-code" style="font-family:monospace; font-size:2rem; color:var(--multi); margin-bottom:15px">----</div>
+                    <button class="option-btn" style="background:var(--multi); color:#fff" onclick="shareRoom()">SHARE INVITE 📤</button>
+                </div>
+                <div style="font-size:.75rem; color:rgba(255,255,255,.5); cursor:pointer; margin-top:15px" onclick="document.getElementById('multi-modal').style.display='none'">[ CLOSE ]</div>
             </div>
         </div>
+        
+        <div id="ai-modal" class="modal-overlay" style="position:fixed; height:100vh; width:100vw; background:rgba(0,0,0,.8)">
+            <div class="modal-content">
+                <div style="color:var(--neon); font-size:1.2rem; margin-bottom:15px; letter-spacing:2px">CPU CHALLENGE</div>
+                <button class="option-btn" onclick="startAI('easy')">EASY</button>
+                <button class="option-btn" onclick="startAI('hard')">HARD</button>
+                <button class="option-btn" style="color:var(--danger); border-color:var(--danger)" onclick="startAI('insane')">INSANE</button>
+                <div style="font-size:.75rem; color:rgba(255,255,255,.5); cursor:pointer; margin-top:10px" onclick="aiModal.style.display='none'">[ CLOSE ]</div>
+            </div>
+        </div>
+        
+        <footer>By Nakul</footer>
     </div>
-
-    <!-- Footer credit -->
-    <footer>By Nakul</footer>
-
-    <!-- 
-    =========================================================================
-    JAVASCRIPT - COMPLETE CHESS GAME LOGIC
-    =========================================================================
-    All game functionality with detailed documentation
-    -->
+    
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    
     <script>
-        // =====================================================================
-        // DOM ELEMENT REFERENCES
-        // =====================================================================
-        // Get references to all important DOM elements for manipulation
-        const boardEl = document.getElementById("board");           // The chessboard grid
-        const statusEl = document.getElementById("status");         // Game status display
-        const historyEl = document.getElementById("history");       // Move history container
-        const promoModal = document.getElementById("promo-modal");  // Pawn promotion modal
-        const aiModal = document.getElementById("ai-modal");        // AI selection modal
-        const endModal = document.getElementById("end-modal");      // Game end modal
+        // DOM Elements
+        const boardEl = document.getElementById("board");
+        const statusEl = document.getElementById("status");
+        const historyEl = document.getElementById("history");
+        const promoModal = document.getElementById("promo-modal");
+        const aiModal = document.getElementById("ai-modal");
+        const endModal = document.getElementById("end-modal");
+        const multiModal = document.getElementById("multi-modal");
 
-        // =====================================================================
-        // INITIAL BOARD STATE
-        // =====================================================================
-        // Standard chess starting position
-        // Lowercase = black pieces, Uppercase = white pieces, '.' = empty square
+        // Game State
         let board = [
-            ["r", "n", "b", "q", "k", "b", "n", "r"],  // Row 0: Black back rank
-            ["p", "p", "p", "p", "p", "p", "p", "p"],  // Row 1: Black pawns
-            [".", ".", ".", ".", ".", ".", ".", "."],  // Row 2: Empty
-            [".", ".", ".", ".", ".", ".", ".", "."],  // Row 3: Empty
-            [".", ".", ".", ".", ".", ".", ".", "."],  // Row 4: Empty
-            [".", ".", ".", ".", ".", ".", ".", "."],  // Row 5: Empty
-            ["P", "P", "P", "P", "P", "P", "P", "P"],  // Row 6: White pawns
-            ["R", "N", "B", "Q", "K", "B", "N", "R"]   // Row 7: White back rank
+            ["r", "n", "b", "q", "k", "b", "n", "r"],
+            ["p", "p", "p", "p", "p", "p", "p", "p"],
+            Array(8).fill("."),
+            Array(8).fill("."),
+            Array(8).fill("."),
+            Array(8).fill("."),
+            ["P", "P", "P", "P", "P", "P", "P", "P"],
+            ["R", "N", "B", "Q", "K", "B", "N", "R"]
         ];
-
-        // =====================================================================
-        // PIECE SYMBOLS MAPPING
-        // =====================================================================
-        // Maps piece letters to Unicode chess symbols for display
+        
         const pieces = {
-            "r": "♖", "n": "♘", "b": "♗", "q": "♕", "k": "♔", "p": "♙",  // Black pieces (Unicode)
-            "R": "♜", "N": "♞", "B": "♝", "Q": "♛", "K": "♚", "P": "♟"   // White pieces (Unicode)
+            "r": "♖", "n": "♘", "b": "♗", "q": "♕", "k": "♔", "p": "♙",
+            "R": "♜", "N": "♞", "B": "♝", "Q": "♛", "K": "♚", "P": "♟"
         };
-
-        // =====================================================================
-        // GAME STATE VARIABLES
-        // =====================================================================
-        let turn = "white";                     // Current player's turn ("white" or "black")
-        let selected = null;                    // Currently selected piece coordinates [row, col]
-        let legalMoves = [];                     // Array of legal moves for selected piece
-        let gameOver = false;                    // Flag indicating if game has ended
-        let lastMove = null;                      // Last move made {r1,c1,r2,c2,p}
-        let historyView = null;                   // Move being viewed in history
-        let whiteTime = 0;                         // White's elapsed time in seconds
-        let blackTime = 0;                         // Black's elapsed time in seconds
-        let timerInterval = null;                  // Reference to timer interval
-        let vsAI = false;                          // Flag for playing against AI
-        let aiLevel = 'easy';                       // AI difficulty level
-        let castling = {                           // Castling rights tracking
-            whiteK: true,   // White kingside castling available
-            whiteQ: true,   // White queenside castling available
-            blackK: true,   // Black kingside castling available
-            blackQ: true    // Black queenside castling available
+        
+        let turn = "white";
+        let selected = null;
+        let legalMoves = [];
+        let gameOver = false;
+        let lastMove = null;
+        let historyView = null;
+        let whiteTime = 0;
+        let blackTime = 0;
+        let timerInterval = null;
+        let vsAI = false;
+        let aiLevel = 'easy';
+        let castling = {
+            whiteK: true,
+            whiteQ: true,
+            blackK: true,
+            blackQ: true
         };
-        let enPassantTarget = null;                 // En passant target square [row, col]
+        let enPassantTarget = null;
+        let peer = null;
+        let conn = null;
+        let mySide = null;
 
-        // =====================================================================
-        // PIECE VALUES FOR AI EVALUATION
-        // =====================================================================
-        // Standard chess piece values with slight adjustments
+        // Piece weights for AI evaluation
         const weights = {
-            "p": 10, "n": 32, "b": 33, "r": 50, "q": 90, "k": 900,  // Black pieces
-            "P": 10, "N": 32, "B": 33, "R": 50, "Q": 90, "K": 900   // White pieces
+            "p": 10, "n": 32, "b": 33, "r": 50, "q": 90, "k": 9000,
+            "P": 10, "N": 32, "B": 33, "R": 50, "Q": 90, "K": 9000
         };
 
-        // =====================================================================
-        // UTILITY FUNCTIONS
-        // =====================================================================
-
-        /**
-         * Determines if a piece is white
-         * @param {string} p - Piece character
-         * @returns {boolean} True if piece is white
-         */
-        const isWhite = p => p !== "." && p === p.toUpperCase();
-
-        /**
-         * Checks if coordinates are within board boundaries
-         * @param {number} r - Row
-         * @param {number} c - Column
-         * @returns {boolean} True if coordinates are valid (0-7)
-         */
+        // Utility Functions
+        const isWhite = (p) => p !== "." && p === p.toUpperCase();
         const inside = (r, c) => r >= 0 && r < 8 && c >= 0 && c < 8;
 
-        // =====================================================================
-        // BOARD RENDERING FUNCTION
-        // =====================================================================
-        /**
-         * Draws the complete chessboard with all visual indicators
-         * Handles square colors, piece placement, highlights for:
-         * - Selected piece
-         * - Legal moves
-         * - Last move
-         * - History view
-         * - Check
-         */
+        // Board Drawing
         function drawBoard() {
-            // Clear the board container
             boardEl.innerHTML = "";
-            
-            // Find current king position for check detection
             const kPos = findKing(turn);
             const kInCheck = inCheck(turn, board);
 
-            // Loop through all 64 squares
             for (let r = 0; r < 8; r++) {
                 for (let c = 0; c < 8; c++) {
-                    // Create square element
                     const sq = document.createElement("div");
-                    
-                    // Set base class and color based on position
                     sq.className = "square " + ((r + c) % 2 ? "dark" : "light");
 
-                    // Apply history view highlight if this square is part of viewed move
-                    if (historyView && 
-                        ((historyView.r1 == r && historyView.c1 == c) || 
-                         (historyView.r2 == r && historyView.c2 == c))) {
+                    // Apply special highlights
+                    if (historyView && (historyView.r1 == r && historyView.c1 == c || historyView.r2 == r && historyView.c2 == c)) {
                         sq.classList.add("history-view");
-                    }
-                    // Apply last move highlight
-                    else if (lastMove && 
-                             ((lastMove.r1 == r && lastMove.c1 == c) || 
-                              (lastMove.r2 == r && lastMove.c2 == c))) {
+                    } else if (lastMove && (lastMove.r1 == r && lastMove.c1 == c || lastMove.r2 == r && lastMove.c2 == c)) {
                         sq.classList.add("last-move");
                     }
 
-                    // Get piece at current position
                     const p = board[r][c];
-                    
-                    // If square contains a piece
                     if (p !== ".") {
-                        sq.textContent = pieces[p];           // Set piece symbol
-                        sq.setAttribute("data-side", isWhite(p) ? "white" : "black");  // Set side for rotation
+                        sq.textContent = pieces[p];
+                        sq.setAttribute("data-side", isWhite(p) ? "white" : "black");
                         
-                        // Apply check highlight if this is the king and in check
+                        // Highlight king in check
                         if (kInCheck && r === kPos[0] && c === kPos[1]) {
                             sq.classList.add("check");
                         }
                     }
 
-                    // Highlight selected piece square
+                    // Selected square highlight
                     if (selected && selected[0] == r && selected[1] == c) {
                         sq.classList.add("selected");
                     }
 
-                    // Add move dots for legal move destinations
+                    // Legal move dots
                     if (legalMoves.some(m => m[0] == r && m[1] == c)) {
                         sq.classList.add("move-dot");
                     }
 
-                    // Attach click handler
                     sq.onclick = () => onSquare(r, c);
-                    
-                    // Add square to board
                     boardEl.appendChild(sq);
                 }
             }
         }
 
-        // =====================================================================
-        // SQUARE CLICK HANDLER
-        // =====================================================================
-        /**
-         * Handles all square click events
-         * Manages piece selection, move execution, and game flow
-         * @param {number} r - Clicked row
-         * @param {number} c - Clicked column
-         */
+        // Square Click Handler
         function onSquare(r, c) {
-            // Prevent moves if game over and not in history view
-            if (gameOver && !historyView) return;
-            
-            // Prevent moves during promotion modal or AI turn
-            if ("flex" === promoModal.style.display || (vsAI && "black" === turn)) return;
+            if (gameOver && !historyView || "flex" === promoModal.style.display || 
+                vsAI && "black" === turn || conn && conn.open && mySide !== turn) {
+                return;
+            }
 
-            // Clear history view if active
             if (historyView) {
                 historyView = null;
                 drawBoard();
             }
 
-            // Check if clicked square is a legal move destination
             const move = legalMoves.find(m => m[0] === r && m[1] === c);
             
-            // If a piece is selected and destination is legal, execute the move
             if (selected && move) {
                 executeMove(selected[0], selected[1], r, c, move[2]);
+                
+                if (conn && conn.open) {
+                    conn.send({
+                        type: 'move',
+                        r1: selected[0],
+                        c1: selected[1],
+                        r2: r,
+                        c2: c,
+                        mt: move[2]
+                    });
+                }
                 return;
             }
 
-            // Get piece at clicked square
             const p = board[r][c];
-            
-            // If square has a piece and it belongs to current player
-            if ("." !== p && (turn === "white" === isWhite(p))) {
-                // Select this piece
+            if ("." !== p && turn === "white" === isWhite(p)) {
                 selected = [r, c];
-                // Calculate legal moves (filtering out moves that would leave king in check)
-                legalMoves = getMoves(r, c).filter(m => 
-                    !inCheck(turn, simulateMove(r, c, m[0], m[1], m[2]))
-                );
+                legalMoves = getMoves(r, c).filter(m => !inCheck(turn, simulateMove(r, c, m[0], m[1], m[2])));
                 drawBoard();
             } else {
-                // Deselect if clicking empty square or opponent's piece
                 selected = null;
                 legalMoves = [];
                 drawBoard();
             }
         }
 
-        // =====================================================================
-        // MOVE SIMULATION FUNCTION
-        // =====================================================================
-        /**
-         * Simulates a move on a temporary board without affecting the actual game
-         * Used for check validation and AI calculations
-         * @param {number} r1 - Source row
-         * @param {number} c1 - Source column
-         * @param {number} r2 - Destination row
-         * @param {number} c2 - Destination column
-         * @param {string} type - Move type (normal, ep, ck, cq)
-         * @returns {Array} New board state after move
-         */
+        // Move Simulation
         function simulateMove(r1, c1, r2, c2, type) {
-            // Create deep copy of board
             const temp = board.map(row => [...row]);
             const p = temp[r1][c1];
-            
-            // Move piece to destination
             temp[r2][c2] = p;
             temp[r1][c1] = ".";
             
-            // Handle en passant capture
             if ('ep' === type) {
-                temp[r1][c2] = ".";  // Remove captured pawn
+                temp[r1][c2] = ".";
             }
             
-            // Handle kingside castling
             if ('ck' === type) {
-                temp[r2][c2 - 1] = temp[r2][c2 + 1];  // Move rook
-                temp[r2][c2 + 1] = ".";                 // Clear original rook square
+                temp[r2][c2 - 1] = temp[r2][c2 + 1];
+                temp[r2][c2 + 1] = ".";
             }
             
-            // Handle queenside castling
             if ('cq' === type) {
-                temp[r2][c2 + 1] = temp[r2][c2 - 2];  // Move rook
-                temp[r2][c2 - 2] = ".";                 // Clear original rook square
+                temp[r2][c2 + 1] = temp[r2][c2 - 2];
+                temp[r2][c2 - 2] = ".";
             }
             
             return temp;
         }
 
-        // =====================================================================
-        // MOVE EXECUTION FUNCTION
-        // =====================================================================
-        /**
-         * Executes a move on the actual board
-         * Updates all game state including captured pieces, castling rights, en passant
-         * Handles special moves and triggers promotion when needed
-         * @param {number} r1 - Source row
-         * @param {number} c1 - Source column
-         * @param {number} r2 - Destination row
-         * @param {number} c2 - Destination column
-         * @param {string} type - Move type
-         */
+        // Execute Move
         function executeMove(r1, c1, r2, c2, type) {
-            const p = board[r1][c1];  // Moving piece
-            let t = board[r2][c2];     // Captured piece (if any)
+            const p = board[r1][c1];
+            let t = board[r2][c2];
 
-            // Handle en passant capture
+            // En passant capture
             if ('ep' === type) {
-                t = board[r1][c2];      // Pawn captured en passant
-                board[r1][c2] = ".";    // Remove captured pawn
+                t = board[r1][c2];
+                board[r1][c2] = ".";
             }
 
-            // Add captured piece to appropriate display
+            // Update captured pieces display
             if ("." !== t) {
                 document.getElementById(isWhite(t) ? "black-captured" : "white-captured").textContent += pieces[t];
             }
 
-            // Handle kingside castling rook movement
+            // Castling
             if ('ck' === type) {
-                board[r2][c2 - 1] = board[r2][c2 + 1];  // Move rook
-                board[r2][c2 + 1] = ".";                 // Clear original rook square
+                board[r2][c2 - 1] = board[r2][c2 + 1];
+                board[r2][c2 + 1] = ".";
             }
-
-            // Handle queenside castling rook movement
-            if ('cq' === type) {
-                board[r2][c2 + 1] = board[r2][c2 - 2];  // Move rook
-                board[r2][c2 - 2] = ".";                 // Clear original rook square
-            }
-
-            // Create move data for history
-            const mData = { r1, c1, r2, c2, p };
             
-            // Create history item button
+            if ('cq' === type) {
+                board[r2][c2 + 1] = board[r2][c2 - 2];
+                board[r2][c2 - 2] = ".";
+            }
+
+            // Add to history
+            const mData = { r1, c1, r2, c2, p };
             const mBtn = document.createElement("div");
             mBtn.className = "history-item";
-            // Format: piece symbol + algebraic notation (e.g., "♟e5")
             mBtn.textContent = `${pieces[p]}${String.fromCharCode(97 + c2)}${8 - r2}`;
-            mBtn.onclick = e => {
+            mBtn.onclick = (e) => {
                 e.stopPropagation();
-                historyView = mData;  // Set history view
-                drawBoard();           // Redraw with highlight
+                historyView = mData;
+                drawBoard();
             };
-            historyEl.appendChild(mBtn);           // Add to history container
-            historyEl.scrollLeft = historyEl.scrollWidth;  // Auto-scroll to latest move
+            historyEl.appendChild(mBtn);
+            historyEl.scrollLeft = historyEl.scrollWidth;
 
-            // Execute the move on the actual board
-            board[r2][c2] = p;    // Place piece at destination
-            board[r1][c1] = ".";  // Clear source square
-            
-            // Update last move
+            // Execute move
+            board[r2][c2] = p;
+            board[r1][c1] = ".";
             lastMove = mData;
 
-            // =================================================================
-            // UPDATE CASTLING RIGHTS
-            // =================================================================
-            // If king moved, lose all castling rights
+            // Update castling rights
             if ('K' === p) {
                 castling.whiteK = castling.whiteQ = false;
             }
             if ('k' === p) {
                 castling.blackK = castling.blackQ = false;
             }
-            
-            // If rook moved from kingside corner, lose kingside castling
-            if ((7 === r1 && 7 === c1) || (7 === r2 && 7 === c2)) castling.whiteK = false;
-            // If rook moved from queenside corner, lose queenside castling
-            if ((7 === r1 && 0 === c1) || (7 === r2 && 0 === c2)) castling.whiteQ = false;
-            // Same for black
-            if ((0 === r1 && 7 === c1) || (0 === r2 && 7 === c2)) castling.blackK = false;
-            if ((0 === r1 && 0 === c1) || (0 === r2 && 0 === c2)) castling.blackQ = false;
+            if (7 === r1 && 7 === c1 || 7 === r2 && 7 === c2) {
+                castling.whiteK = false;
+            }
+            if (7 === r1 && 0 === c1 || 7 === r2 && 0 === c2) {
+                castling.whiteQ = false;
+            }
+            if (0 === r1 && 7 === c1 || 0 === r2 && 7 === c2) {
+                castling.blackK = false;
+            }
+            if (0 === r1 && 0 === c1 || 0 === r2 && 0 === c2) {
+                castling.blackQ = false;
+            }
 
-            // =================================================================
-            // SET EN PASSANT TARGET
-            // =================================================================
-            // If pawn moved two squares, set en passant target
-            enPassantTarget = ('p' === p.toLowerCase() && 2 === Math.abs(r2 - r1)) ? 
-                              [(r1 + r2) / 2, c1] : null;
+            // Set en passant target
+            enPassantTarget = 'p' === p.toLowerCase() && 2 === Math.abs(r2 - r1) ? [(r1 + r2) / 2, c1] : null;
 
-            // =================================================================
-            // CHECK FOR PAWN PROMOTION
-            // =================================================================
+            // Handle pawn promotion
             if ('p' === p.toLowerCase() && (0 === r2 || 7 === r2)) {
-                // If playing against AI and it's black's turn, auto-promote to queen
-                if (vsAI && "black" === turn) {
-                    board[r2][c2] = 'q';  // AI always promotes to queen
-                    finalizeTurn();         // End turn
+                if (vsAI && "black" === turn || conn && mySide !== turn) {
+                    board[r2][c2] = isWhite(p) ? 'Q' : 'q';
+                    finalizeTurn();
                 } else {
-                    showPromotion(r2, c2);  // Show promotion modal for human player
+                    showPromotion(r2, c2);
                 }
             } else {
-                finalizeTurn();  // End turn normally
+                finalizeTurn();
             }
         }
 
-        // =====================================================================
-        // PAWN PROMOTION MODAL
-        // =====================================================================
-        /**
-         * Displays pawn promotion options modal
-         * @param {number} r - Promotion square row
-         * @param {number} c - Promotion square column
-         */
+        // Promotion Modal
         function showPromotion(r, c) {
             const o = document.getElementById("promo-options");
-            o.innerHTML = "";  // Clear previous options
-            promoModal.style.display = "flex";  // Show modal
-
-            // Determine available pieces based on current player's color
+            o.innerHTML = "";
+            promoModal.style.display = "flex";
+            
             const ch = turn === "white" ? 
-                [   // White promotion pieces (uppercase)
-                    { id: "Q", label: "QUEEN" },
-                    { id: "R", label: "ROOK" },
-                    { id: "B", label: "BISHOP" },
-                    { id: "N", label: "KNIGHT" }
-                ] : 
-                [   // Black promotion pieces (lowercase)
-                    { id: "q", label: "QUEEN" },
-                    { id: "r", label: "ROOK" },
-                    { id: "b", label: "BISHOP" },
-                    { id: "n", label: "KNIGHT" }
-                ];
-
-            // Create button for each promotion option
+                [{ id: "Q", label: "QUEEN" }, { id: "R", label: "ROOK" }, { id: "B", label: "BISHOP" }, { id: "N", label: "KNIGHT" }] :
+                [{ id: "q", label: "QUEEN" }, { id: "r", label: "ROOK" }, { id: "b", label: "BISHOP" }, { id: "n", label: "KNIGHT" }];
+            
             ch.forEach(x => {
                 const b = document.createElement("button");
                 b.className = "option-btn";
                 b.innerHTML = `<span style="font-size:1.5rem">${pieces[x.id]}</span> ${x.label}`;
                 b.onclick = () => {
-                    board[r][c] = x.id;  // Set promoted piece
-                    promoModal.style.display = "none";  // Hide modal
-                    finalizeTurn();  // End turn
+                    board[r][c] = x.id;
+                    promoModal.style.display = "none";
+                    
+                    if (conn && conn.open) {
+                        conn.send({
+                            type: 'move',
+                            r,
+                            c,
+                            piece: x.id,
+                            isPromo: true
+                        });
+                    }
+                    
+                    finalizeTurn();
                 };
                 o.appendChild(b);
             });
         }
 
-        // =====================================================================
-        // TURN FINALIZATION
-        // =====================================================================
-        /**
-         * Finalizes the current turn and switches to next player
-         * Updates UI, checks for game over, triggers AI if needed
-         */
+        // Turn Management
         function finalizeTurn() {
-            // Clear selection and legal moves
             selected = null;
             legalMoves = [];
-
-            // Switch turns
             turn = "white" === turn ? "black" : "white";
+            statusEl.textContent = turn.toUpperCase() + "'S TURN" + (vsAI ? " (CPU)" : "");
             
-            // Update status display
-            statusEl.textContent = turn.toUpperCase() + "'S TURN" + (vsAI ? " (CPU Thinking...)" : "");
-            
-            // Update active timer highlight
             document.getElementById("white-timer").classList.toggle("active", "white" === turn);
             document.getElementById("black-timer").classList.toggle("active", "black" === turn);
             
-            // Redraw board
             drawBoard();
 
-            // Check if game is over and trigger AI move if applicable
             if (!checkGameOver() && vsAI && "black" === turn) {
-                setTimeout(() => {
-                    requestAnimationFrame(makeAIMove);  // Schedule AI move
-                }, 250);  // Small delay for visual feedback
+                setTimeout(() => requestAnimationFrame(makeAIMove), 250);
             }
         }
 
-        // =====================================================================
-        // GAME OVER CHECK
-        // =====================================================================
-        /**
-         * Checks if game has ended (checkmate or stalemate)
-         * @returns {boolean} True if game is over
-         */
+        // Game Over Check
         function checkGameOver() {
-            let has = false;  // Flag for any legal moves
-
-            // Check all pieces of current player
+            let has = false;
+            
             for (let r = 0; r < 8; r++) {
                 for (let c = 0; c < 8; c++) {
                     const p = board[r][c];
-                    if ("." !== p && (turn === "white" === isWhite(p))) {
-                        // If any piece has a legal move, game is not over
-                        if (getMoves(r, c).filter(m => 
-                            !inCheck(turn, simulateMove(r, c, m[0], m[1], m[2]))
-                        ).length > 0) {
+                    if ("." !== p && turn === "white" === isWhite(p)) {
+                        if (getMoves(r, c).filter(m => !inCheck(turn, simulateMove(r, c, m[0], m[1], m[2]))).length > 0) {
                             has = true;
                             break;
                         }
@@ -1086,15 +681,13 @@
                 }
             }
 
-            // If no legal moves, game is over
             if (!has) {
                 gameOver = true;
-                clearInterval(timerInterval);  // Stop clock
-
+                clearInterval(timerInterval);
+                
                 const ti = document.getElementById("end-title");
                 const re = document.getElementById("end-result");
-
-                // Determine if it's checkmate or stalemate
+                
                 if (inCheck(turn, board)) {
                     const w = "white" === turn ? "BLACK" : "WHITE";
                     ti.textContent = "CHECKMATE";
@@ -1104,66 +697,38 @@
                     re.textContent = "MATCH ENDED IN A DRAW";
                 }
                 
-                endModal.style.display = "flex";  // Show end game modal
+                endModal.style.display = "flex";
                 return true;
             }
+            
             return false;
         }
 
-        // =====================================================================
-        // END MODAL CLOSE FUNCTION
-        // =====================================================================
-        /**
-         * Closes the end game modal
-         */
-        function closeEndModal() {
-            endModal.style.display = "none";
-        }
-
-        // =====================================================================
-        // MOVE GENERATION
-        // =====================================================================
-        /**
-         * Generates all possible moves for a piece
-         * Implements all chess rules including special moves
-         * @param {number} r - Piece row
-         * @param {number} c - Piece column
-         * @param {Array} b - Board to use (defaults to current board)
-         * @param {boolean} pure - If true, generate all moves without special moves
-         * @returns {Array} Array of possible moves [destRow, destCol, moveType]
-         */
+        // Move Generation
         function getMoves(r, c, b = board, pure = false) {
-            const p = b[r][c];  // Piece at position
-            const m = [];        // Array to store moves
-            
-            // Direction multiplier based on piece color (white moves up, black moves down)
+            const p = b[r][c];
+            const m = [];
             let dir = isWhite(p) ? -1 : 1;
 
-            // =================================================================
-            // PAWN MOVES
-            // =================================================================
+            // Pawn moves
             if ("p" === p.toLowerCase()) {
-                // One square forward
+                // Forward move
                 if (!pure && inside(r + dir, c) && "." === b[r + dir][c]) {
                     m.push([r + dir, c]);
                 }
                 
-                // Two squares forward from starting position
-                if (!pure && ((isWhite(p) && 6 === r) || (!isWhite(p) && 1 === r)) && 
-                    "." === b[r + dir][c] && "." === b[r + 2 * dir][c]) {
+                // Double forward
+                if (!pure && (isWhite(p) && 6 === r || !isWhite(p) && 1 === r) && "." === b[r + dir][c] && "." === b[r + 2 * dir][c]) {
                     m.push([r + 2 * dir, c]);
                 }
                 
-                // Captures (diagonal moves)
+                // Captures
                 [[dir, -1], [dir, 1]].forEach(d => {
-                    let nr = r + d[0];
-                    let nc = c + d[1];
+                    let nr = r + d[0], nc = c + d[1];
                     if (inside(nr, nc)) {
-                        // Normal capture
                         if ("." !== b[nr][nc] && isWhite(p) !== isWhite(b[nr][nc])) {
                             m.push([nr, nc]);
                         }
-                        // En passant capture
                         if (!pure && enPassantTarget && nr === enPassantTarget[0] && nc === enPassantTarget[1]) {
                             m.push([nr, nc, 'ep']);
                         }
@@ -1171,35 +736,27 @@
                 });
             }
 
-            // =================================================================
-            // SLIDING PIECES (Queen, Rook, Bishop)
-            // =================================================================
+            // Rook, Bishop, Queen moves
             if ("rbq".includes(p.toLowerCase())) {
-                // All 8 possible directions
                 [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(d => {
-                    // Skip rook diagonal moves
-                    if ("r" === p.toLowerCase() && d[0] && d[1]) return;
-                    // Skip bishop straight moves
-                    if ("b" === p.toLowerCase() && (!d[0] || !d[1])) return;
+                    if ("r" === p.toLowerCase() && d[0] && d[1] || "b" === p.toLowerCase() && (!d[0] || !d[1])) {
+                        return;
+                    }
                     
-                    let nr = r + d[0];
-                    let nc = c + d[1];
-                    
-                    // Continue in direction until blocked
+                    let nr = r + d[0], nc = c + d[1];
                     while (inside(nr, nc)) {
                         if ("." === b[nr][nc]) {
-                            m.push([nr, nc]);  // Empty square - valid move
+                            m.push([nr, nc]);
                             if (pure) {
                                 nr += d[0];
                                 nc += d[1];
                                 continue;
                             }
                         } else {
-                            // Capture if opponent's piece
                             if (isWhite(p) !== isWhite(b[nr][nc])) {
                                 m.push([nr, nc]);
                             }
-                            break;  // Blocked by piece
+                            break;
                         }
                         nr += d[0];
                         nc += d[1];
@@ -1207,53 +764,37 @@
                 });
             }
 
-            // =================================================================
-            // KNIGHT MOVES
-            // =================================================================
+            // Knight moves
             if ("n" === p.toLowerCase()) {
-                // All 8 knight move offsets
                 [[2, 1], [2, -1], [-2, 1], [-2, -1], [1, 2], [1, -2], [-1, 2], [-1, -2]].forEach(d => {
-                    let nr = r + d[0];
-                    let nc = c + d[1];
-                    // Move if square is empty or contains opponent's piece
+                    let nr = r + d[0], nc = c + d[1];
                     if (inside(nr, nc) && ("." === b[nr][nc] || isWhite(p) !== isWhite(b[nr][nc]))) {
                         m.push([nr, nc]);
                     }
                 });
             }
 
-            // =================================================================
-            // KING MOVES
-            // =================================================================
+            // King moves
             if ("k" === p.toLowerCase()) {
-                // All adjacent squares
                 [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(d => {
-                    let nr = r + d[0];
-                    let nc = c + d[1];
-                    // Move if square is empty or contains opponent's piece
+                    let nr = r + d[0], nc = c + d[1];
                     if (inside(nr, nc) && ("." === b[nr][nc] || isWhite(p) !== isWhite(b[nr][nc]))) {
                         m.push([nr, nc]);
                     }
                 });
 
-                // =============================================================
-                // CASTLING
-                // =============================================================
-                // Only if not in check and not in pure move generation
+                // Castling
                 if (!pure && !inCheck(turn, b)) {
                     if ("white" === turn) {
-                        // Kingside castling
                         if (castling.whiteK && "." === b[7][5] && "." === b[7][6] && 
                             !isAttacked(7, 5, 'black', b) && !isAttacked(7, 6, 'black', b)) {
                             m.push([7, 6, 'ck']);
                         }
-                        // Queenside castling
                         if (castling.whiteQ && "." === b[7][1] && "." === b[7][2] && "." === b[7][3] && 
                             !isAttacked(7, 3, 'black', b) && !isAttacked(7, 2, 'black', b)) {
                             m.push([7, 2, 'cq']);
                         }
                     } else {
-                        // Black castling
                         if (castling.blackK && "." === b[0][5] && "." === b[0][6] && 
                             !isAttacked(0, 5, 'white', b) && !isAttacked(0, 6, 'white', b)) {
                             m.push([0, 6, 'ck']);
@@ -1265,26 +806,15 @@
                     }
                 }
             }
+
             return m;
         }
 
-        // =====================================================================
-        // ATTACK DETECTION
-        // =====================================================================
-        /**
-         * Checks if a square is attacked by any piece of a given side
-         * @param {number} r - Target row
-         * @param {number} c - Target column
-         * @param {string} side - Attacking side ('white' or 'black')
-         * @param {Array} b - Board to check
-         * @returns {boolean} True if square is attacked
-         */
+        // Attack Detection
         function isAttacked(r, c, side, b) {
-            // Check all squares
             for (let i = 0; i < 8; i++) {
                 for (let j = 0; j < 8; j++) {
-                    if ("." !== b[i][j] && (side === 'white' === isWhite(b[i][j]))) {
-                        // If piece can move to target square, it's attacked
+                    if ("." !== b[i][j] && side === 'white' === isWhite(b[i][j])) {
                         if (getMoves(i, j, b, true).some(m => m[0] === r && m[1] === c)) {
                             return true;
                         }
@@ -1294,97 +824,57 @@
             return false;
         }
 
-        // =====================================================================
-        // KING POSITION FINDER
-        // =====================================================================
-        /**
-         * Finds the coordinates of a player's king
-         * @param {string} side - Player side ('white' or 'black')
-         * @param {Array} b - Board to search
-         * @returns {Array} [row, col] of king
-         */
+        // King Position
         function findKing(side, b = board) {
             for (let r = 0; r < 8; r++) {
                 for (let c = 0; c < 8; c++) {
-                    if ("k" === b[r][c].toLowerCase() && (side === "white" === isWhite(b[r][c]))) {
+                    if ("k" === b[r][c].toLowerCase() && side === "white" === isWhite(b[r][c])) {
                         return [r, c];
                     }
                 }
             }
-            return [0, 0];  // Fallback (should never happen)
+            return [0, 0];
         }
 
-        // =====================================================================
-        // CHECK DETECTION
-        // =====================================================================
-        /**
-         * Determines if a player is in check
-         * @param {string} side - Player side to check
-         * @param {Array} b - Board to evaluate
-         * @returns {boolean} True if player is in check
-         */
+        // Check Detection
         function inCheck(side, b) {
             const k = findKing(side, b);
-            // King is attacked by opponent's pieces
             return isAttacked(k[0], k[1], side === 'white' ? 'black' : 'white', b);
         }
 
-        // =====================================================================
-        // BOARD ROTATION TOGGLE
-        // =====================================================================
-        /**
-         * Toggles board rotation for black's perspective
-         */
+        // Board Rotation
         function toggleFlip() {
             boardEl.classList.toggle("no-flip");
         }
 
-        // =====================================================================
-        // AI MODAL FUNCTIONS
-        // =====================================================================
-        /**
-         * Opens AI difficulty selection modal
-         */
+        // AI Modal
         function openAISelection() {
             aiModal.style.display = "flex";
         }
 
-        /**
-         * Starts game against AI with selected difficulty
-         * @param {string} l - Difficulty level ('easy', 'hard', 'insane')
-         */
         function startAI(l) {
-            aiLevel = l;                 // Set difficulty
-            vsAI = true;                 // Enable AI mode
-            aiModal.style.display = "none";  // Close modal
-            document.getElementById("ai-btn").textContent = "AI: " + l.toUpperCase();  // Update button
+            aiLevel = l;
+            vsAI = true;
+            aiModal.style.display = "none";
+            document.getElementById("ai-btn").textContent = "AI: " + l.toUpperCase();
             
-            // If it's black's turn, trigger AI move after delay
             if ("black" === turn) {
                 setTimeout(makeAIMove, 300);
             }
         }
 
-        // =====================================================================
-        // AI EVALUATION FUNCTION
-        // =====================================================================
-        /**
-         * Evaluates board position for minimax algorithm
-         * Positive values favor white, negative favor black
-         * @param {Array} b - Board to evaluate
-         * @returns {number} Position score
-         */
+        // AI Evaluation
         function evaluateBoard(b) {
             let s = 0;
             for (let r = 0; r < 8; r++) {
                 for (let c = 0; c < 8; c++) {
                     if ("." !== b[r][c]) {
-                        let v = weights[b[r][c]];  // Get piece value
-                        s += isWhite(b[r][c]) ? v : -v;  // Add for white, subtract for black
+                        let v = weights[b[r][c]];
+                        s += isWhite(b[r][c]) ? v : -v;
                         
                         // Center control bonus
                         if (r >= 2 && r <= 5 && c >= 2 && c <= 5) {
-                            s += isWhite(b[r][c]) ? 1 : -1;
+                            s += isWhite(b[r][c]) ? 5 : -5;
                         }
                     }
                 }
@@ -1392,33 +882,19 @@
             return s;
         }
 
-        // =====================================================================
-        // MINIMAX ALGORITHM
-        // =====================================================================
-        /**
-         * Minimax with alpha-beta pruning for AI move selection
-         * @param {Array} tb - Current board state
-         * @param {number} d - Remaining depth
-         * @param {number} a - Alpha value for pruning
-         * @param {number} bt - Beta value for pruning
-         * @param {boolean} maxing - True if maximizing player (white)
-         * @returns {number} Best evaluation score
-         */
+        // Minimax Algorithm
         function minimax(tb, d, a, bt, maxing) {
-            // Base case: reached depth limit
             if (0 === d) return evaluateBoard(tb);
-
+            
             let side = maxing ? "white" : "black";
             let pos = [];
-
-            // Generate all possible moves for current side
+            
             for (let r = 0; r < 8; r++) {
                 for (let c = 0; c < 8; c++) {
                     let p = tb[r][c];
                     if ("." !== p && isWhite(p) === maxing) {
                         getMoves(r, c, tb).forEach(m => {
-                            const nb = simulateMoveOn(tb, r, c, m[0], m[1], m[2]);
-                            // Only consider moves that don't leave king in check
+                            const nb = simulateMoveOn(tb, r, c, m[0], m[1]);
                             if (!inCheck(side, nb)) {
                                 pos.push(nb);
                             }
@@ -1426,48 +902,33 @@
                     }
                 }
             }
-
-            // If no legal moves, evaluate terminal state
+            
             if (0 === pos.length) {
-                return inCheck(side, tb) ? (maxing ? -9999 : 9999) : 0;
+                return inCheck(side, tb) ? (maxing ? -99999 : 99999) : 0;
             }
-
-            // Maximizing player (white)
+            
             if (maxing) {
                 let mx = -Infinity;
                 for (let m of pos) {
                     let ev = minimax(m, d - 1, a, bt, false);
                     mx = Math.max(mx, ev);
                     a = Math.max(a, ev);
-                    if (bt <= a) break;  // Alpha-beta pruning
+                    if (bt <= a) break;
                 }
                 return mx;
-            } 
-            // Minimizing player (black)
-            else {
+            } else {
                 let mn = Infinity;
                 for (let m of pos) {
                     let ev = minimax(m, d - 1, a, bt, true);
                     mn = Math.min(mn, ev);
                     bt = Math.min(bt, ev);
-                    if (bt <= a) break;  // Alpha-beta pruning
+                    if (bt <= a) break;
                 }
                 return mn;
             }
         }
 
-        // =====================================================================
-        // MOVE SIMULATION FOR AI
-        // =====================================================================
-        /**
-         * Simplified move simulation for AI (no special moves needed)
-         * @param {Array} b - Board to modify
-         * @param {number} r1 - Source row
-         * @param {number} c1 - Source column
-         * @param {number} r2 - Destination row
-         * @param {number} c2 - Destination column
-         * @returns {Array} New board state
-         */
+        // Board Simulation Helper
         function simulateMoveOn(b, r1, c1, r2, c2) {
             const t = b.map(row => [...row]);
             t[r2][c2] = t[r1][c1];
@@ -1475,32 +936,26 @@
             return t;
         }
 
-        // =====================================================================
-        // AI MOVE EXECUTION
-        // =====================================================================
-        /**
-         * Calculates and executes the best AI move based on difficulty level
-         */
+        // AI Move
         function makeAIMove() {
-            // Don't move if game is over
             if (gameOver) return;
-
-            // Set search depth based on difficulty
+            
             let d = 'easy' === aiLevel ? 1 : 'hard' === aiLevel ? 2 : 3;
-            let bv = Infinity;  // Best value (minimizing for black)
-            let pm = [];         // Possible moves
-
-            // Generate all legal moves for black
+            let bv = Infinity;
+            let pm = [];
+            
             for (let r = 0; r < 8; r++) {
                 for (let c = 0; c < 8; c++) {
                     let p = board[r][c];
-                    if ("." !== p && !isWhite(p)) {  // Black pieces only
+                    if ("." !== p && !isWhite(p)) {
                         getMoves(r, c).forEach(m => {
-                            const t = simulateMove(r, c, m[0], m[1], m[2]);  // Simulate move
-                            if (!inCheck(turn, t)) {  // Only consider legal moves
+                            const t = simulateMove(r, c, m[0], m[1], m[2]);
+                            if (!inCheck(turn, t)) {
                                 pm.push({
-                                    r1: r, c1: c,
-                                    r2: m[0], c2: m[1],
+                                    r1: r,
+                                    c1: c,
+                                    r2: m[0],
+                                    c2: m[1],
                                     type: m[2],
                                     board: t
                                 });
@@ -1509,60 +964,142 @@
                     }
                 }
             }
-
-            // If no moves available, return
+            
             if (0 === pm.length) return;
-
-            // Shuffle moves for variety (prevents deterministic play)
+            
             pm.sort(() => Math.random() - 0.5);
-
-            // Evaluate each move using minimax
-            let tm = [];  // Top moves
+            let tm = [];
+            
             for (let m of pm) {
-                let v = minimax(m.board, d - 1, -Infinity, Infinity, true);  // Evaluate from white's perspective
-                if (v < bv) {  // Better move found (lower value better for black)
+                let v = minimax(m.board, d - 1, -Infinity, Infinity, true);
+                if (v < bv) {
                     bv = v;
-                    tm = [m];  // Reset top moves
+                    tm = [m];
                 } else if (v === bv) {
-                    tm.push(m);  // Add to equally good moves
+                    tm.push(m);
                 }
             }
-
-            // Choose random move from best options
+            
             const bm = tm[Math.floor(Math.random() * tm.length)];
             if (bm) {
-                executeMove(bm.r1, bm.c1, bm.r2, bm.c2, bm.type);  // Execute the chosen move
+                executeMove(bm.r1, bm.c1, bm.r2, bm.c2, bm.type);
             }
         }
 
-        // =====================================================================
-        // TIMER INITIALIZATION
-        // =====================================================================
-        /**
-         * Start the game clock
-         * Updates timers every second for the current player
-         */
-        timerInterval = setInterval(() => {
-            if (gameOver) return;  // Don't update if game ended
+        // Multiplayer Functions
+        function openMultiplayer() {
+            multiModal.style.display = "flex";
+        }
+
+        function hostRoom() {
+            const id = Math.floor(1000 + Math.random() * 9000).toString();
+            peer = new Peer('neon-chess-' + id);
+            mySide = 'white';
             
-            // Increment time for current player
+            peer.on('open', () => {
+                document.getElementById('multi-initial').style.display = 'none';
+                document.getElementById('multi-hosting').style.display = 'block';
+                document.getElementById('room-code').innerText = id;
+            });
+            
+            peer.on('connection', c => {
+                conn = c;
+                setupConnection();
+            });
+        }
+
+        function joinRoom() {
+            const id = prompt("Enter 4-Digit Room Code:");
+            if (!id) return;
+            connectToHost(id);
+        }
+
+        function connectToHost(id) {
+            peer = new Peer();
+            mySide = 'black';
+            
+            peer.on('open', () => {
+                conn = peer.connect('neon-chess-' + id);
+                setupConnection();
+            });
+        }
+
+        async function shareRoom() {
+            const c = document.getElementById('room-code').innerText;
+            const s = {
+                title: 'Neon Chess',
+                text: `Join my Chess room: ${c}`,
+                url: window.location.href.split('?')[0] + `?join=${c}`
+            };
+            
+            try {
+                if (navigator.share) {
+                    await navigator.share(s);
+                } else {
+                    navigator.clipboard.writeText(s.url);
+                    alert("Link copied!");
+                }
+            } catch (e) {
+                // Handle error silently
+            }
+        }
+
+        function setupConnection() {
+            conn.on('open', () => {
+                multiModal.style.display = "none";
+                vsAI = false;
+                document.getElementById('multi-btn').innerText = "Online: " + mySide.toUpperCase();
+                
+                if (mySide === 'black') {
+                    toggleFlip();
+                }
+                
+                statusEl.textContent = turn.toUpperCase() + "'S TURN (CONNECTED)";
+            });
+            
+            conn.on('data', d => {
+                if (d.type === 'promo') {
+                    board[d.r][d.c] = d.piece;
+                    finalizeTurn();
+                } else {
+                    executeMove(d.r1, d.c1, d.r2, d.c2, d.mt);
+                }
+            });
+        }
+
+        // URL Parameter Handling
+        window.onload = () => {
+            const p = new URLSearchParams(window.location.search);
+            const j = p.get('join');
+            if (j) {
+                setTimeout(() => connectToHost(j), 500);
+            }
+        };
+
+        // Modal Close
+        function closeEndModal() {
+            endModal.style.display = "none";
+        }
+
+        // Timer
+        timerInterval = setInterval(() => {
+            if (gameOver) return;
+            
             if (turn === "white") {
                 whiteTime++;
             } else {
                 blackTime++;
             }
             
-            // Format and display times (MM:SS format)
-            const f = t => Math.floor(t / 60).toString().padStart(2, '0') + ":" + 
-                          (t % 60).toString().padStart(2, '0');
+            const f = (t) => Math.floor(t / 60).toString().padStart(2, '0') + ":" + 
+                              (t % 60).toString().padStart(2, '0');
+            
             document.getElementById("white-timer").textContent = f(whiteTime);
             document.getElementById("black-timer").textContent = f(blackTime);
-        }, 1000);  // Update every second
+        }, 1000);
 
-        // =====================================================================
-        // INITIAL BOARD RENDER
-        // =====================================================================
-        drawBoard();  // Draw the initial board state
+        // Initial Draw
+        drawBoard();
     </script>
 </body>
 </html>
