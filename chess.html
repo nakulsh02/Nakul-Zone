@@ -344,7 +344,6 @@
                     <div id="room-code" style="font-family:monospace; font-size:2rem; color:var(--multi); margin-bottom:15px">----</div>
                     <button class="option-btn" style="background:var(--multi); color:#fff" onclick="shareRoom()">SHARE INVITE 📤</button>
                 </div>
-                <div id="multi-waiting" style="display:none; color:var(--neon); margin:10px 0;">Connecting...</div>
                 <div style="font-size:.75rem; color:rgba(255,255,255,.5); cursor:pointer; margin-top:15px" onclick="document.getElementById('multi-modal').style.display='none'">[ CLOSE ]</div>
             </div>
         </div>
@@ -361,6 +360,8 @@
         
         <footer>By Nakul</footer>
     </div>
+    
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     
     <script>
         // DOM Elements
@@ -407,12 +408,9 @@
             blackQ: true
         };
         let enPassantTarget = null;
-        
-        // Multiplayer variables - using simple localStorage based approach
-        let isMultiplayer = false;
+        let peer = null;
+        let conn = null;
         let mySide = null;
-        let gameId = null;
-        let checkInterval = null;
 
         // Piece weights for AI evaluation
         const weights = {
@@ -472,7 +470,7 @@
         // Square Click Handler
         function onSquare(r, c) {
             if (gameOver && !historyView || "flex" === promoModal.style.display || 
-                vsAI && "black" === turn || (isMultiplayer && mySide !== turn)) {
+                vsAI && "black" === turn || conn && conn.open && mySide !== turn) {
                 return;
             }
 
@@ -486,17 +484,15 @@
             if (selected && move) {
                 executeMove(selected[0], selected[1], r, c, move[2]);
                 
-                // Send move to opponent via localStorage
-                if (isMultiplayer && gameId) {
-                    const moveData = {
+                if (conn && conn.open) {
+                    conn.send({
+                        type: 'move',
                         r1: selected[0],
                         c1: selected[1],
                         r2: r,
                         c2: c,
-                        type: move[2],
-                        timestamp: Date.now()
-                    };
-                    localStorage.setItem('chess_move_' + gameId, JSON.stringify(moveData));
+                        mt: move[2]
+                    });
                 }
                 return;
             }
@@ -607,7 +603,7 @@
 
             // Handle pawn promotion
             if ('p' === p.toLowerCase() && (0 === r2 || 7 === r2)) {
-                if (vsAI && "black" === turn || (isMultiplayer && mySide !== turn)) {
+                if (vsAI && "black" === turn || conn && mySide !== turn) {
                     board[r2][c2] = isWhite(p) ? 'Q' : 'q';
                     finalizeTurn();
                 } else {
@@ -636,15 +632,14 @@
                     board[r][c] = x.id;
                     promoModal.style.display = "none";
                     
-                    // Send promotion via localStorage
-                    if (isMultiplayer && gameId) {
-                        const promoData = {
-                            r: r,
-                            c: c,
+                    if (conn && conn.open) {
+                        conn.send({
+                            type: 'move',
+                            r,
+                            c,
                             piece: x.id,
-                            timestamp: Date.now()
-                        };
-                        localStorage.setItem('chess_promo_' + gameId, JSON.stringify(promoData));
+                            isPromo: true
+                        });
                     }
                     
                     finalizeTurn();
@@ -658,7 +653,7 @@
             selected = null;
             legalMoves = [];
             turn = "white" === turn ? "black" : "white";
-            statusEl.textContent = turn.toUpperCase() + "'S TURN" + (vsAI ? " (CPU)" : (isMultiplayer ? " (ONLINE)" : ""));
+            statusEl.textContent = turn.toUpperCase() + "'S TURN" + (vsAI ? " (CPU)" : "");
             
             document.getElementById("white-timer").classList.toggle("active", "white" === turn);
             document.getElementById("black-timer").classList.toggle("active", "black" === turn);
@@ -689,7 +684,6 @@
             if (!has) {
                 gameOver = true;
                 clearInterval(timerInterval);
-                if (checkInterval) clearInterval(checkInterval);
                 
                 const ti = document.getElementById("end-title");
                 const re = document.getElementById("end-result");
@@ -992,169 +986,85 @@
             }
         }
 
-        // --- ULTRA SIMPLE MULTIPLAYER USING LOCALSTORAGE (WORKS ON ALL DEVICES) ---
+        // Multiplayer Functions
         function openMultiplayer() {
             multiModal.style.display = "flex";
         }
 
         function hostRoom() {
-            // Generate a simple room code
-            gameId = Math.random().toString(36).substring(2, 10).toUpperCase();
-            
-            // Set up as host (white)
+            const id = Math.floor(1000 + Math.random() * 9000).toString();
+            peer = new Peer('neon-chess-' + id);
             mySide = 'white';
-            isMultiplayer = true;
-            vsAI = false;
             
-            // Store game state
-            localStorage.setItem('chess_host_' + gameId, 'true');
-            localStorage.setItem('chess_turn_' + gameId, 'white');
+            peer.on('open', () => {
+                document.getElementById('multi-initial').style.display = 'none';
+                document.getElementById('multi-hosting').style.display = 'block';
+                document.getElementById('room-code').innerText = id;
+            });
             
-            // Clear any old moves
-            localStorage.removeItem('chess_move_' + gameId);
-            localStorage.removeItem('chess_promo_' + gameId);
-            
-            document.getElementById('multi-initial').style.display = 'none';
-            document.getElementById('multi-hosting').style.display = 'block';
-            document.getElementById('room-code').innerText = gameId;
-            document.getElementById('multi-status').innerText = 'WAITING FOR OPPONENT...';
-            
-            // Start checking for opponent
-            checkInterval = setInterval(() => {
-                if (localStorage.getItem('chess_joined_' + gameId)) {
-                    document.getElementById('multi-status').innerText = 'OPPONENT CONNECTED!';
-                    clearInterval(checkInterval);
-                    
-                    // Start game after a short delay
-                    setTimeout(() => {
-                        multiModal.style.display = 'none';
-                        document.getElementById('multi-btn').innerText = "Online: WHITE";
-                        statusEl.textContent = turn.toUpperCase() + "'S TURN (ONLINE)";
-                        
-                        // Start listening for moves
-                        startListeningForMoves();
-                    }, 1000);
-                }
-            }, 1000);
+            peer.on('connection', c => {
+                conn = c;
+                setupConnection();
+            });
         }
 
         function joinRoom() {
-            const code = prompt("Enter room code:");
-            if (!code || code.length < 4) {
-                alert('Please enter a valid room code');
-                return;
-            }
-            
-            gameId = code.toUpperCase();
-            
-            // Check if room exists
-            if (!localStorage.getItem('chess_host_' + gameId)) {
-                alert('Room not found. Please check the code.');
-                return;
-            }
-            
-            // Set up as joiner (black)
-            mySide = 'black';
-            isMultiplayer = true;
-            vsAI = false;
-            
-            // Mark that we joined
-            localStorage.setItem('chess_joined_' + gameId, 'true');
-            
-            document.getElementById('multi-initial').style.display = 'none';
-            document.getElementById('multi-waiting').style.display = 'block';
-            document.getElementById('multi-waiting').innerText = 'Connecting to room...';
-            
-            // Wait a moment then start game
-            setTimeout(() => {
-                multiModal.style.display = 'none';
-                document.getElementById('multi-btn').innerText = "Online: BLACK";
-                statusEl.textContent = turn.toUpperCase() + "'S TURN (ONLINE)";
-                
-                // Flip board for black
-                toggleFlip();
-                
-                // Start listening for moves
-                startListeningForMoves();
-            }, 1500);
+            const id = prompt("Enter 4-Digit Room Code:");
+            if (!id) return;
+            connectToHost(id);
         }
 
-        function startListeningForMoves() {
-            let lastMoveTime = 0;
-            let lastPromoTime = 0;
+        function connectToHost(id) {
+            peer = new Peer();
+            mySide = 'black';
             
-            // Check for moves every second
-            checkInterval = setInterval(() => {
-                if (gameOver) {
-                    clearInterval(checkInterval);
-                    return;
-                }
-                
-                // Check for opponent moves
-                const moveData = localStorage.getItem('chess_move_' + gameId);
-                if (moveData) {
-                    try {
-                        const move = JSON.parse(moveData);
-                        if (move.timestamp > lastMoveTime) {
-                            lastMoveTime = move.timestamp;
-                            
-                            // Only apply if it's opponent's move (not our own)
-                            if ((mySide === 'white' && turn === 'black') || 
-                                (mySide === 'black' && turn === 'white')) {
-                                executeMove(move.r1, move.c1, move.r2, move.c2, move.type);
-                                
-                                // Clear the move after processing
-                                localStorage.removeItem('chess_move_' + gameId);
-                            }
-                        }
-                    } catch (e) {}
-                }
-                
-                // Check for promotions
-                const promoData = localStorage.getItem('chess_promo_' + gameId);
-                if (promoData) {
-                    try {
-                        const promo = JSON.parse(promoData);
-                        if (promo.timestamp > lastPromoTime) {
-                            lastPromoTime = promo.timestamp;
-                            
-                            // Only apply if it's opponent's promotion
-                            if ((mySide === 'white' && turn === 'black') || 
-                                (mySide === 'black' && turn === 'white')) {
-                                board[promo.r][promo.c] = promo.piece;
-                                finalizeTurn();
-                                
-                                // Clear the promo after processing
-                                localStorage.removeItem('chess_promo_' + gameId);
-                            }
-                        }
-                    } catch (e) {}
-                }
-            }, 1000);
+            peer.on('open', () => {
+                conn = peer.connect('neon-chess-' + id);
+                setupConnection();
+            });
         }
 
         async function shareRoom() {
-            if (!gameId) {
-                alert('Room not ready');
-                return;
-            }
-            
-            const shareUrl = window.location.href.split('?')[0] + `?join=${gameId}`;
+            const c = document.getElementById('room-code').innerText;
+            const s = {
+                title: 'Neon Chess',
+                text: `Join my Chess room: ${c}`,
+                url: window.location.href.split('?')[0] + `?join=${c}`
+            };
             
             try {
                 if (navigator.share) {
-                    await navigator.share({
-                        title: 'Neon Chess',
-                        text: `Join my Chess game. Room code: ${gameId}`,
-                        url: shareUrl
-                    });
+                    await navigator.share(s);
                 } else {
-                    navigator.clipboard.writeText(shareUrl);
-                    alert("Invite link copied!\nRoom code: " + gameId);
+                    navigator.clipboard.writeText(s.url);
+                    alert("Link copied!");
                 }
             } catch (e) {
-                prompt("Room code:", gameId);
+                // Handle error silently
             }
+        }
+
+        function setupConnection() {
+            conn.on('open', () => {
+                multiModal.style.display = "none";
+                vsAI = false;
+                document.getElementById('multi-btn').innerText = "Online: " + mySide.toUpperCase();
+                
+                if (mySide === 'black') {
+                    toggleFlip();
+                }
+                
+                statusEl.textContent = turn.toUpperCase() + "'S TURN (CONNECTED)";
+            });
+            
+            conn.on('data', d => {
+                if (d.type === 'promo') {
+                    board[d.r][d.c] = d.piece;
+                    finalizeTurn();
+                } else {
+                    executeMove(d.r1, d.c1, d.r2, d.c2, d.mt);
+                }
+            });
         }
 
         // URL Parameter Handling
@@ -1162,13 +1072,7 @@
             const p = new URLSearchParams(window.location.search);
             const j = p.get('join');
             if (j) {
-                setTimeout(() => {
-                    openMultiplayer();
-                    setTimeout(() => {
-                        gameId = j.toUpperCase();
-                        joinRoom();
-                    }, 500);
-                }, 500);
+                setTimeout(() => connectToHost(j), 500);
             }
         };
 
