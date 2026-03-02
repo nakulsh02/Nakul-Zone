@@ -491,7 +491,7 @@
                         c1: selected[1],
                         r2: r,
                         c2: c,
-                        mt: move[2]
+                        mt: move[2] || ''
                     });
                 }
                 return;
@@ -634,11 +634,10 @@
                     
                     if (conn && conn.open) {
                         conn.send({
-                            type: 'move',
-                            r,
-                            c,
-                            piece: x.id,
-                            isPromo: true
+                            type: 'promo',
+                            r: r,
+                            c: c,
+                            piece: x.id
                         });
                     }
                     
@@ -653,7 +652,7 @@
             selected = null;
             legalMoves = [];
             turn = "white" === turn ? "black" : "white";
-            statusEl.textContent = turn.toUpperCase() + "'S TURN" + (vsAI ? " (CPU)" : "");
+            statusEl.textContent = turn.toUpperCase() + "'S TURN" + (vsAI ? " (CPU)" : (conn ? " (ONLINE)" : ""));
             
             document.getElementById("white-timer").classList.toggle("active", "white" === turn);
             document.getElementById("black-timer").classList.toggle("active", "black" === turn);
@@ -986,63 +985,138 @@
             }
         }
 
-        // Multiplayer Functions
+        // --- FIXED MULTIPLAYER (PeerJS robust) ---
         function openMultiplayer() {
+            // close any existing peer
+            if (peer && !peer.destroyed) peer.destroy();
+            peer = null;
+            conn = null;
+            mySide = null;
+            document.getElementById('multi-initial').style.display = 'block';
+            document.getElementById('multi-hosting').style.display = 'none';
             multiModal.style.display = "flex";
         }
 
         function hostRoom() {
             const id = Math.floor(1000 + Math.random() * 9000).toString();
-            peer = new Peer('neon-chess-' + id);
+            // Use custom ID with prefix but also allow reconnection
+            peer = new Peer('nchess-' + id + '-' + Date.now()); // unique to avoid collision
+            
             mySide = 'white';
             
-            peer.on('open', () => {
+            peer.on('open', (pid) => {
                 document.getElementById('multi-initial').style.display = 'none';
                 document.getElementById('multi-hosting').style.display = 'block';
                 document.getElementById('room-code').innerText = id;
+                document.getElementById('multi-status').innerText = 'WAITING FOR PLAYER...';
             });
             
-            peer.on('connection', c => {
+            peer.on('connection', (c) => {
                 conn = c;
                 setupConnection();
+                document.getElementById('multi-status').innerText = 'CONNECTED!';
+                setTimeout(() => multiModal.style.display = 'none', 800);
+            });
+            
+            peer.on('error', (err) => {
+                alert('Host error: ' + err.type);
+                multiModal.style.display = 'none';
             });
         }
 
         function joinRoom() {
             const id = prompt("Enter 4-Digit Room Code:");
-            if (!id) return;
+            if (!id || id.length !== 4) return;
             connectToHost(id);
         }
 
         function connectToHost(id) {
+            // show searching
+            document.getElementById('multi-initial').style.display = 'none';
+            document.getElementById('multi-hosting').style.display = 'block';
+            document.getElementById('room-code').innerText = id;
+            document.getElementById('multi-status').innerText = 'CONNECTING...';
+            
+            peer = new Peer(); // random id
+            
+            peer.on('open', () => {
+                // try to connect to host using known prefix: host might have id 'nchess-XXXX-...' but we don't know exact.
+                // Instead we broadcast to a known room channel? better: use PeerJS custom prefix: we can't guess full id.
+                // REAL SOLUTION: host uses fixed prefix + code, we use that full string.
+                // So we need host to have deterministic ID. Let's adjust:
+                // We'll change hostRoom to use fixed 'neon-'+code
+                // But we already host with random. To keep working, we must have both use same known pattern.
+                // Quick fix: hostRoom will now use 'neon-'+code (no timestamp)
+                // We also need to close previous peer.
+                // Overwrite hostRoom and join with fixed ID:
+                // I'll redefine functions right here to override previous ones.
+                // But we are inside script, I'll just replace the functions before usage.
+                // We'll overwrite them at the bottom.
+                alert('Join using fixed ID method – see updated code below');
+            });
+            
+            // Proper fix: we re-declare host/join outside.
+        }
+        
+        // FIXED HOST & JOIN (override)
+        window.hostRoom = function() {
+            if (peer && !peer.destroyed) peer.destroy();
+            const code = Math.floor(1000 + Math.random() * 9000).toString();
+            const peerId = 'neon-chess-' + code;  // deterministic
+            
+            peer = new Peer(peerId);
+            mySide = 'white';
+            
+            peer.on('open', () => {
+                document.getElementById('multi-initial').style.display = 'none';
+                document.getElementById('multi-hosting').style.display = 'block';
+                document.getElementById('room-code').innerText = code;
+                document.getElementById('multi-status').innerText = 'WAITING FOR PLAYER...';
+            });
+            
+            peer.on('connection', (c) => {
+                conn = c;
+                setupConnection();
+                document.getElementById('multi-status').innerText = 'CONNECTED!';
+                setTimeout(() => multiModal.style.display = 'none', 800);
+            });
+            
+            peer.on('error', (err) => {
+                alert('Host error: ' + err);
+                multiModal.style.display = 'none';
+            });
+        };
+        
+        window.joinRoom = function() {
+            const code = prompt("Enter 4-Digit Room Code:");
+            if (!code || code.length !== 4) return;
+            
+            if (peer && !peer.destroyed) peer.destroy();
+            const hostId = 'neon-chess-' + code;
+            
+            document.getElementById('multi-initial').style.display = 'none';
+            document.getElementById('multi-hosting').style.display = 'block';
+            document.getElementById('room-code').innerText = code;
+            document.getElementById('multi-status').innerText = 'CONNECTING...';
+            
             peer = new Peer();
             mySide = 'black';
             
             peer.on('open', () => {
-                conn = peer.connect('neon-chess-' + id);
-                setupConnection();
+                conn = peer.connect(hostId);
+                conn.on('open', () => {
+                    setupConnection();
+                    document.getElementById('multi-status').innerText = 'CONNECTED!';
+                    setTimeout(() => multiModal.style.display = 'none', 800);
+                });
+                conn.on('error', () => alert('Connection failed'));
             });
-        }
-
-        async function shareRoom() {
-            const c = document.getElementById('room-code').innerText;
-            const s = {
-                title: 'Neon Chess',
-                text: `Join my Chess room: ${c}`,
-                url: window.location.href.split('?')[0] + `?join=${c}`
-            };
             
-            try {
-                if (navigator.share) {
-                    await navigator.share(s);
-                } else {
-                    navigator.clipboard.writeText(s.url);
-                    alert("Link copied!");
-                }
-            } catch (e) {
-                // Handle error silently
-            }
-        }
+            peer.on('error', (err) => {
+                alert('Join error: ' + err);
+                multiModal.style.display = 'none';
+            });
+        };
 
         function setupConnection() {
             conn.on('open', () => {
@@ -1051,32 +1125,56 @@
                 document.getElementById('multi-btn').innerText = "Online: " + mySide.toUpperCase();
                 
                 if (mySide === 'black') {
-                    toggleFlip();
+                    toggleFlip(); // rotate for black
                 }
                 
-                statusEl.textContent = turn.toUpperCase() + "'S TURN (CONNECTED)";
+                statusEl.textContent = turn.toUpperCase() + "'S TURN (ONLINE)";
+                drawBoard();
             });
             
-            conn.on('data', d => {
+            conn.on('data', (d) => {
                 if (d.type === 'promo') {
                     board[d.r][d.c] = d.piece;
                     finalizeTurn();
-                } else {
-                    executeMove(d.r1, d.c1, d.r2, d.c2, d.mt);
+                } else if (d.type === 'move') {
+                    // execute remote move
+                    const move = d;
+                    executeMove(move.r1, move.c1, move.r2, move.c2, move.mt || '');
                 }
+            });
+            
+            conn.on('close', () => {
+                alert('Opponent disconnected');
+                location.reload();
             });
         }
 
-        // URL Parameter Handling
+        async function shareRoom() {
+            const c = document.getElementById('room-code').innerText;
+            const url = window.location.href.split('?')[0] + '?join=' + c;
+            try {
+                if (navigator.share) {
+                    await navigator.share({ title: 'Neon Chess', text: `Join room ${c}`, url });
+                } else {
+                    navigator.clipboard.writeText(url);
+                    alert("Invite link copied!");
+                }
+            } catch (e) {}
+        }
+
+        // URL auto-join
         window.onload = () => {
             const p = new URLSearchParams(window.location.search);
             const j = p.get('join');
             if (j) {
-                setTimeout(() => connectToHost(j), 500);
+                setTimeout(() => {
+                    openMultiplayer();
+                    setTimeout(() => window.joinRoom(j), 300);
+                }, 500);
             }
+            drawBoard();
         };
 
-        // Modal Close
         function closeEndModal() {
             endModal.style.display = "none";
         }
@@ -1084,16 +1182,8 @@
         // Timer
         timerInterval = setInterval(() => {
             if (gameOver) return;
-            
-            if (turn === "white") {
-                whiteTime++;
-            } else {
-                blackTime++;
-            }
-            
-            const f = (t) => Math.floor(t / 60).toString().padStart(2, '0') + ":" + 
-                              (t % 60).toString().padStart(2, '0');
-            
+            if (turn === "white") whiteTime++; else blackTime++;
+            const f = (t) => Math.floor(t / 60).toString().padStart(2, '0') + ":" + (t % 60).toString().padStart(2, '0');
             document.getElementById("white-timer").textContent = f(whiteTime);
             document.getElementById("black-timer").textContent = f(blackTime);
         }, 1000);
